@@ -4,7 +4,7 @@ import { ConvexClientProvider } from "@/components/providers/convex-provider";
 import { PwaProvider } from "@/components/pwa/pwa-provider";
 import { ToasterProvider } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { STORE_NAME } from "@/lib/brand/constants";
+import { STORE_LOGO_PATH, STORE_NAME } from "@/lib/brand/constants";
 import "./globals.css";
 
 const inter = Inter({
@@ -47,13 +47,13 @@ export const metadata: Metadata = {
     telephone: false,
   },
   icons: {
-    icon: "/jamaa-market-logo.png",
-    apple: "/jamaa-market-logo.png",
+    icon: STORE_LOGO_PATH,
+    apple: STORE_LOGO_PATH,
   },
 };
 
 export const viewport = {
-  themeColor: "#3d2b1f",
+  themeColor: "#7a1518",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

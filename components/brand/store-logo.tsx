@@ -66,10 +66,9 @@ export function StoreLogo({
   className,
   priority,
 }: StoreLogoProps) {
-  const isWordmark =
-    variant === "full" ||
-    variant === "white" ||
-    variant === "printFull";
+  const isWordmark = variant === "full" || variant === "printFull";
+  const isStacked = variant === "white" || variant === "print";
+  const usesWidthLayout = isWordmark || variant === "white";
   const src = resolveLogoPath(variant);
 
   return (
@@ -77,14 +76,14 @@ export function StoreLogo({
     <img
       src={src}
       alt={STORE_NAME}
-      width={isWordmark ? 340 : 280}
-      height={isWordmark ? 113 : 280}
+      width={isWordmark ? 623 : isStacked ? 389 : 256}
+      height={isWordmark ? 220 : isStacked ? 400 : 256}
       decoding="sync"
       fetchPriority={priority ? "high" : "auto"}
       className={cn(
         "w-auto max-w-full shrink-0 object-contain bg-transparent",
-        isWordmark ? fullSizeClass[size] : sizeClass[size],
-        isWordmark && "h-auto w-full",
+        usesWidthLayout ? fullSizeClass[size] : sizeClass[size],
+        usesWidthLayout && "h-auto w-full",
         className,
       )}
     />

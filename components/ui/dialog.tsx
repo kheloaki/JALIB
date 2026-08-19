@@ -27,7 +27,7 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "data-ending-style:opacity-0 data-starting-style:opacity-0 fixed inset-0 z-50 bg-[rgba(44,24,16,0.35)] transition-opacity duration-150 supports-backdrop-filter:backdrop-blur-xs",
+        "data-ending-style:opacity-0 data-starting-style:opacity-0 fixed inset-0 z-50 bg-[rgba(63,12,14,0.35)] transition-opacity duration-150 supports-backdrop-filter:backdrop-blur-xs",
         className,
       )}
       {...props}
@@ -51,7 +51,7 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:scale-[0.98] data-starting-style:scale-[0.98] border-border bg-card text-card-foreground fixed top-1/2 left-1/2 z-[60] grid w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-2xl border p-6 shadow-[0_8px_32px_rgba(61,43,31,0.14)] transition-[opacity,transform] duration-200 ease-out",
+          "data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:scale-[0.98] data-starting-style:scale-[0.98] border-border bg-card text-card-foreground fixed top-1/2 left-1/2 z-[60] grid w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-2xl border p-6 shadow-[0_8px_32px_rgba(122,21,24,0.14)] transition-[opacity,transform] duration-200 ease-out",
           className,
         )}
         {...props}

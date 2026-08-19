@@ -1,9 +1,70 @@
 import { v } from "convex/values";
 
 import { internalMutation, mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import { requireAnyPermission, requirePermission } from "./authz";
 import { deleteClientCascade, deleteInvoiceCascade } from "./deleteCascade";
-import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_PRODUCTS } from "./defaultCatalog";
+import { DEFAULT_PRODUCT_CATEGORIES } from "./defaultCatalog";
+
+const SUPERMARKET_CATEGORY_LABELS = [
+  "Alimentation",
+  "Nettoyage",
+  "Papeterie",
+  "Électronique",
+] as const;
+
+const defaultCatalogResult = v.object({
+  categoriesInserted: v.number(),
+  productsInserted: v.number(),
+});
+
+async function insertDefaultCatalog(ctx: MutationCtx) {
+  const now = Date.now();
+  let categoriesInserted = 0;
+
+  for (const label of DEFAULT_PRODUCT_CATEGORIES) {
+    const normalizedLabel = label.toLowerCase();
+    const existing = await ctx.db
+      .query("productCategories")
+      .withIndex("by_normalizedLabel", (q) =>
+        q.eq("normalizedLabel", normalizedLabel),
+      )
+      .unique();
+    if (existing) continue;
+    await ctx.db.insert("productCategories", {
+      label,
+      normalizedLabel,
+      kind: "builtIn",
+      createdAt: now,
+    });
+    categoriesInserted += 1;
+  }
+
+  return { categoriesInserted, productsInserted: 0 };
+}
+
+async function removeEmptySupermarketCategories(ctx: MutationCtx) {
+  let supermarketCategoriesRemoved = 0;
+  for (const label of SUPERMARKET_CATEGORY_LABELS) {
+    const existing = await ctx.db
+      .query("productCategories")
+      .withIndex("by_normalizedLabel", (q) =>
+        q.eq("normalizedLabel", label.toLowerCase()),
+      )
+      .unique();
+    if (!existing) continue;
+    const product = await ctx.db
+      .query("products")
+      .withIndex("by_categoryLabel", (q) =>
+        q.eq("categoryLabel", existing.label),
+      )
+      .first();
+    if (product) continue;
+    await ctx.db.delete(existing._id);
+    supermarketCategoriesRemoved += 1;
+  }
+  return supermarketCategoriesRemoved;
+}
 
 export const status = query({
   args: {},
@@ -33,68 +94,24 @@ export const status = query({
 
 export const ensureDefaultCatalog = mutation({
   args: {},
-  returns: v.object({
-    categoriesInserted: v.number(),
-    productsInserted: v.number(),
-  }),
+  returns: defaultCatalogResult,
   handler: async (ctx) => {
     await requirePermission(ctx, "stock.edit_products");
-    const now = Date.now();
-    let categoriesInserted = 0;
-    let productsInserted = 0;
+    return insertDefaultCatalog(ctx);
+  },
+});
 
-    for (const label of DEFAULT_PRODUCT_CATEGORIES) {
-      const normalizedLabel = label.toLowerCase();
-      const existing = await ctx.db
-        .query("productCategories")
-        .withIndex("by_normalizedLabel", (q) =>
-          q.eq("normalizedLabel", normalizedLabel),
-        )
-        .unique();
-      if (existing) continue;
-      await ctx.db.insert("productCategories", {
-        label,
-        normalizedLabel,
-        kind: "builtIn",
-        createdAt: now,
-      });
-      categoriesInserted += 1;
-    }
-
-    for (const product of DEFAULT_PRODUCTS) {
-      const existing = await ctx.db
-        .query("products")
-        .withIndex("by_legacyId", (q) => q.eq("legacyId", product.legacyId))
-        .unique();
-      if (existing) continue;
-      const productId = await ctx.db.insert("products", {
-        legacyId: product.legacyId,
-        name: product.name,
-        categoryLabel: product.categoryLabel,
-        ...("barcode" in product && product.barcode
-          ? { barcode: product.barcode }
-          : {}),
-        sellPriceMadCents: product.sellPriceMadCents,
-        costMadCents: product.costMadCents,
-        stockQty: product.stockQty,
-        stockLow: product.stockQty > 0 && product.stockQty <= 10,
-        imageUrl: product.imageUrl,
-        imageAlt: product.imageAlt,
-        active: true,
-        createdAt: now,
-        updatedAt: now,
-      });
-      await ctx.db.insert("productPriceHistory", {
-        productId,
-        kind: "purchase",
-        amountMadCents: product.costMadCents,
-        recordedAt: now,
-        source: "seed",
-      });
-      productsInserted += 1;
-    }
-
-    return { categoriesInserted, productsInserted };
+/** CLI seed: insert library categories and drop empty supermarket ones. */
+export const ensureDefaultCatalogInternal = internalMutation({
+  args: {},
+  returns: defaultCatalogResult.extend({
+    supermarketCategoriesRemoved: v.number(),
+  }),
+  handler: async (ctx) => {
+    const inserted = await insertDefaultCatalog(ctx);
+    const supermarketCategoriesRemoved =
+      await removeEmptySupermarketCategories(ctx);
+    return { ...inserted, supermarketCategoriesRemoved };
   },
 });
 

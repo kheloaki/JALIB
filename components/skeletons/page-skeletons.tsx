@@ -121,7 +121,7 @@ export function CreditsSummaryCardSkeleton() {
 export function CreditsClientsTableSkeleton() {
   return (
     <SkWhiteCard>
-      <div className="flex items-center justify-between border-b border-[rgba(61,43,31,0.08)] px-6 py-5">
+      <div className="flex items-center justify-between border-b border-[rgba(122,21,24,0.08)] px-6 py-5">
         <Sk className="h-6 w-40 rounded-lg" />
         <Sk className="h-6 w-20 rounded-full" />
       </div>
@@ -134,7 +134,7 @@ export function CreditsClientsTableSkeleton() {
 export function CreditsLedgerPanelSkeleton() {
   return (
     <SkWhiteCard>
-      <div className="border-b border-[rgba(61,43,31,0.08)] px-6 py-5">
+      <div className="border-b border-[rgba(122,21,24,0.08)] px-6 py-5">
         <Sk className="h-6 w-48 rounded-lg" />
       </div>
       <SkTableHead cols={6} />
@@ -153,7 +153,7 @@ export function ClientsPageSkeleton() {
           <SkButton className="size-10 rounded-xl" />
         </header>
         <SkWhiteCard>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(61,43,31,0.08)] px-4 py-4 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(122,21,24,0.08)] px-4 py-4 sm:px-6">
             <div className="flex items-center gap-3">
               <Sk className="h-6 w-36 rounded-lg" />
               <Sk className="h-6 w-10 rounded-full" />
@@ -212,7 +212,7 @@ export function InvoicesPageSkeleton() {
             <SkWhiteCard>
               <SkTableHead cols={7} />
               <SkTableRows cols={7} rows={4} />
-              <div className="flex items-center justify-between border-t border-[rgba(61,43,31,0.08)] px-4 py-3">
+              <div className="flex items-center justify-between border-t border-[rgba(122,21,24,0.08)] px-4 py-3">
                 <SkLine className="w-24" />
                 <div className="flex gap-2">
                   <SkCircle className="size-8" />
@@ -237,7 +237,7 @@ export function InvoiceReceiptSkeleton() {
         <Sk className="h-9 flex-1 rounded-lg" />
         <Sk className="h-9 flex-1 rounded-lg" />
       </div>
-      <div className="space-y-3 rounded-xl border border-dashed border-[rgba(61,43,31,0.12)] p-4">
+      <div className="space-y-3 rounded-xl border border-dashed border-[rgba(122,21,24,0.12)] p-4">
         <SkLine className="mx-auto w-32" />
         <SkLine className="mx-auto w-24" />
         <div className="space-y-2 pt-4">
@@ -471,7 +471,7 @@ export function RolesUsersListSkeleton() {
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}
-          className="flex flex-col gap-3 border-b border-[rgba(61,43,31,0.06)] p-4 last:border-0 sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-3 border-b border-[rgba(122,21,24,0.06)] p-4 last:border-0 sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="min-w-0 flex-1 space-y-2">
             <SkLine className="w-40" />
@@ -515,7 +515,7 @@ export function RolesPageSkeleton() {
               {Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between border-b border-[rgba(61,43,31,0.06)] py-3 last:border-0"
+                  className="flex items-center justify-between border-b border-[rgba(122,21,24,0.06)] py-3 last:border-0"
                 >
                   <SkLine className="w-40" />
                   <Sk className="h-6 w-11 rounded-full" />
@@ -635,7 +635,7 @@ export function PosPageSkeleton() {
               <Sk key={i} className="h-9 w-36 shrink-0 rounded-full" />
             ))}
           </div>
-          <div className="border-b border-[rgba(61,43,31,0.08)] px-4 py-3">
+          <div className="border-b border-[rgba(122,21,24,0.08)] px-4 py-3">
             <div className="flex gap-2 overflow-x-auto">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Sk key={i} className="h-9 w-24 shrink-0 rounded-full" />
@@ -654,7 +654,7 @@ export function PosPageSkeleton() {
             ))}
           </div>
         </div>
-        <div className="hidden min-h-0 w-full max-w-[320px] shrink-0 flex-col border-l border-[rgba(61,43,31,0.08)] bg-white md:flex">
+        <div className="hidden min-h-0 w-full max-w-[320px] shrink-0 flex-col border-l border-[rgba(122,21,24,0.08)] bg-white md:flex">
           <div className="flex-1 space-y-2 overflow-hidden p-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <SkWhiteCard key={i} className="p-3">
@@ -668,7 +668,7 @@ export function PosPageSkeleton() {
               </SkWhiteCard>
             ))}
           </div>
-          <div className="space-y-3 border-t border-[rgba(61,43,31,0.08)] p-3">
+          <div className="space-y-3 border-t border-[rgba(122,21,24,0.08)] p-3">
             <div className="grid grid-cols-2 gap-2">
               <Sk className="h-10 rounded-xl" />
               <Sk className="h-10 rounded-xl" />
@@ -685,7 +685,7 @@ export function PosPageSkeleton() {
               </SkWhiteCard>
             ))}
           </div>
-          <div className="space-y-2 border-t border-[rgba(61,43,31,0.08)] bg-white p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          <div className="space-y-2 border-t border-[rgba(122,21,24,0.08)] bg-white p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
             <div className="grid grid-cols-2 gap-2">
               <Sk className="h-9 rounded-xl" />
               <Sk className="h-9 rounded-xl" />

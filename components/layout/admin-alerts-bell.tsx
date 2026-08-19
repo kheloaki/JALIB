@@ -110,7 +110,7 @@ export function AdminAlertsBell() {
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className="border-border bg-card w-[min(calc(100vw-2rem),22rem)] rounded-2xl p-0 shadow-[0_8px_32px_rgba(61,43,31,0.12)] ring-1 ring-[rgba(61,43,31,0.06)]"
+        className="border-border bg-card w-[min(calc(100vw-2rem),22rem)] rounded-2xl p-0 shadow-[0_8px_32px_rgba(122,21,24,0.12)] ring-1 ring-[rgba(122,21,24,0.06)]"
       >
         <div className="border-border border-b px-4 py-3">
           <div className="flex items-center justify-between gap-2">

@@ -17,6 +17,7 @@ import { SoldByWeightField } from "@/components/products/sold-by-weight-field";
 import type { PosCategory } from "@/components/pos/constants";
 import { POS_CATEGORIES } from "@/components/pos/constants";
 import { PosAddCategoryDialog } from "@/components/pos/pos-add-category-dialog";
+import { DEFAULT_CATALOG_CATEGORY } from "@/lib/catalog/categories";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -82,7 +83,7 @@ export function AddProductDialog({
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
   const [localCategories, setLocalCategories] = useState<string[]>([]);
   const [name, setName] = useState("");
-  const [category, setCategory] = useState("Alimentation");
+  const [category, setCategory] = useState<string>(DEFAULT_CATALOG_CATEGORY);
   const [brandId, setBrandId] = useState<string>("");
   const [priceMad, setPriceMad] = useState(0);
   const [costMad, setCostMad] = useState(0);
@@ -104,7 +105,7 @@ export function AddProductDialog({
   const selectedCategory =
     category && productCategories.includes(category)
       ? category
-      : (productCategories[0] ?? "Alimentation");
+      : (productCategories[0] ?? DEFAULT_CATALOG_CATEGORY);
 
   const normalizedBarcode = useMemo(
     () => normalizeBarcodeInput(barcode),
@@ -161,7 +162,7 @@ export function AddProductDialog({
     setStock(0);
     setSoldByWeight(false);
     setPhotoDataUrl(null);
-    setCategory("Alimentation");
+    setCategory(DEFAULT_CATALOG_CATEGORY);
     setBrandId("");
     setLocalCategories([]);
     setSubmitDuplicate(null);

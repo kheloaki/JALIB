@@ -1,21 +1,19 @@
 import { v } from "convex/values";
 
+import { DEFAULT_CATALOG_CATEGORY } from "../lib/catalog/categories";
 import { internalMutation } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { madToCents } from "./money";
 
-import { DEFAULT_CATALOG_CATEGORY } from "../lib/catalog/categories";
-
 const PRODUCT_PLACEHOLDER_IMAGE = "/product-placeholder.svg";
-const DEFAULT_CATEGORY = DEFAULT_CATALOG_CATEGORY;
 
 const productRow = v.object({
-  legacyArticleId: v.string(),
+  legacyId: v.string(),
   name: v.string(),
-  barcode: v.string(),
+  categoryLabel: v.string(),
   sellPriceMad: v.number(),
   costPriceMad: v.number(),
-  stockQty: v.number(),
+  soldByWeight: v.boolean(),
 });
 
 async function ensureCategory(ctx: MutationCtx, label: string) {
@@ -35,61 +33,12 @@ async function ensureCategory(ctx: MutationCtx, label: string) {
   });
 }
 
-function normalizeBarcode(raw: string): string | undefined {
-  const normalized = raw.trim().replace(/\s+/g, "").toUpperCase();
-  return normalized.length > 0 ? normalized : undefined;
-}
-
 /**
- * Deletes catalog products + price history in batches (CLI / internal).
- * Safe after operational wipe (no invoice lines referencing products).
- */
-export const clearCatalogBatch = internalMutation({
-  args: {
-    limit: v.optional(v.number()),
-  },
-  returns: v.object({
-    productsDeleted: v.number(),
-    priceHistoryDeleted: v.number(),
-    done: v.boolean(),
-  }),
-  handler: async (ctx, args) => {
-    const limit = Math.min(Math.max(1, Math.floor(args.limit ?? 100)), 200);
-    const products = await ctx.db.query("products").take(limit);
-    let productsDeleted = 0;
-    let priceHistoryDeleted = 0;
-
-    for (const product of products) {
-      const history = await ctx.db
-        .query("productPriceHistory")
-        .withIndex("by_productId_recordedAt", (q) =>
-          q.eq("productId", product._id),
-        )
-        .take(50);
-      for (const entry of history) {
-        await ctx.db.delete(entry._id);
-        priceHistoryDeleted += 1;
-      }
-      await ctx.db.delete(product._id);
-      productsDeleted += 1;
-    }
-
-    return {
-      productsDeleted,
-      priceHistoryDeleted,
-      done: products.length < limit,
-    };
-  },
-});
-
-/**
- * Upserts a batch of Jamaa legacy products by legacyId `jamaa:{articleId}`.
- * Also matches existing rows by barcode when present.
+ * Upserts library CSV products by legacyId. Never writes stock quantities.
  */
 export const importBatch = internalMutation({
   args: {
     products: v.array(productRow),
-    categoryLabel: v.optional(v.string()),
   },
   returns: v.object({
     processed: v.number(),
@@ -98,54 +47,44 @@ export const importBatch = internalMutation({
     skipped: v.number(),
   }),
   handler: async (ctx, args) => {
-    const categoryLabel = (args.categoryLabel ?? DEFAULT_CATEGORY).trim();
-    await ensureCategory(ctx, categoryLabel);
     const now = Date.now();
-
+    const ensured = new Set<string>();
     let inserted = 0;
     let updated = 0;
     let skipped = 0;
 
     for (const row of args.products) {
       const name = row.name.trim().replace(/\s+/g, " ");
-      const barcode = normalizeBarcode(row.barcode);
-      const legacyId = `jamaa:${row.legacyArticleId.trim()}`;
-      if (!name || !barcode || !row.legacyArticleId.trim()) {
+      const legacyId = row.legacyId.trim();
+      const categoryLabel = (
+        row.categoryLabel.trim() || DEFAULT_CATALOG_CATEGORY
+      ).replace(/\s+/g, " ");
+      if (!name || !legacyId) {
         skipped += 1;
         continue;
+      }
+
+      if (!ensured.has(categoryLabel.toLowerCase())) {
+        await ensureCategory(ctx, categoryLabel);
+        ensured.add(categoryLabel.toLowerCase());
       }
 
       const sellPriceMadCents = Math.max(0, madToCents(row.sellPriceMad));
       const costMadCents =
         row.costPriceMad > 0 ? madToCents(row.costPriceMad) : null;
-      const stockQty = Number.isFinite(row.stockQty)
-        ? Math.max(0, row.stockQty)
-        : 0;
-      const stockLow = stockQty > 0 && stockQty <= 10;
 
-      const byLegacy = await ctx.db
+      const existing = await ctx.db
         .query("products")
         .withIndex("by_legacyId", (q) => q.eq("legacyId", legacyId))
         .unique();
 
-      let existing = byLegacy;
-      if (!existing) {
-        existing = await ctx.db
-          .query("products")
-          .withIndex("by_barcode", (q) => q.eq("barcode", barcode))
-          .first();
-      }
-
       if (existing) {
         await ctx.db.patch(existing._id, {
-          legacyId,
           name,
           categoryLabel,
-          barcode,
           sellPriceMadCents,
           costMadCents,
-          stockQty,
-          stockLow,
+          ...(row.soldByWeight ? { soldByWeight: true } : {}),
           active: true,
           updatedAt: now,
         });
@@ -157,14 +96,14 @@ export const importBatch = internalMutation({
         legacyId,
         name,
         categoryLabel,
-        barcode,
         sellPriceMadCents,
         costMadCents,
-        stockQty,
-        stockLow,
+        stockQty: 0,
+        stockLow: false,
         imageUrl: PRODUCT_PLACEHOLDER_IMAGE,
         imageAlt: name,
         active: true,
+        ...(row.soldByWeight ? { soldByWeight: true } : {}),
         createdAt: now,
         updatedAt: now,
       });
@@ -185,7 +124,6 @@ export const importBatch = internalMutation({
         recordedAt: now,
         source: "migration",
       });
-
       inserted += 1;
     }
 

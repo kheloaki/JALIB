@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CircleAlert, Lock, LogIn, Mail } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 import { useAuthActions, useConvexAuth } from "@convex-dev/auth/react";
+import { useQuery } from "convex/react";
 
 import { StoreLogo } from "@/components/brand/store-logo";
 import { Button } from "@/components/ui/button";
@@ -16,10 +17,12 @@ import { cn } from "@/lib/utils";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { PasswordStrengthIndicator } from "@/components/auth/password-strength-indicator";
 import { getAuthErrorMessage } from "@/lib/auth/auth-error-message";
+import { FIRST_ADMIN_EMAIL } from "@/lib/auth/first-admin";
 import {
   getPasswordStrength,
   isPasswordAcceptableForSignUp,
 } from "@/lib/auth/password-strength";
+import { api } from "@/convex/_generated/api";
 
 type AuthMode = "signIn" | "resetRequest" | "resetVerify";
 type AuthField = "email" | "password" | "code" | "confirmPassword";
@@ -101,8 +104,11 @@ export function LoginView() {
   const tCommon = useTranslations("common");
   const { signIn } = useAuthActions();
   const { isAuthenticated } = useConvexAuth();
+  const needsFirstAdmin = useQuery(api.authBootstrap.needsFirstAdmin);
   const [authMode, setAuthMode] = useState<AuthMode>("signIn");
+  const [email, setEmail] = useState(FIRST_ADMIN_EMAIL);
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [resetCode, setResetCode] = useState("");
   const [resetNewPassword, setResetNewPassword] = useState("");
@@ -114,6 +120,13 @@ export function LoginView() {
 
   const isResetRequest = authMode === "resetRequest";
   const isResetVerify = authMode === "resetVerify";
+  const isFirstAdminSignup =
+    needsFirstAdmin === true && !isResetRequest && !isResetVerify;
+
+  useEffect(() => {
+    if (!isFirstAdminSignup) return;
+    setEmail(FIRST_ADMIN_EMAIL);
+  }, [isFirstAdminSignup]);
 
   const passwordStrength = getPasswordStrength(
     isResetVerify ? resetNewPassword : password,
@@ -123,7 +136,9 @@ export function LoginView() {
     activePassword.length >= 8 && isPasswordAcceptableForSignUp(activePassword);
   const passwordInvalid =
     Boolean(fieldErrors.password) ||
-    (isResetVerify && activePassword.length > 0 && !signUpPasswordOk);
+    ((isResetVerify || isFirstAdminSignup) &&
+      activePassword.length > 0 &&
+      !signUpPasswordOk);
   const passwordFeedbackMessage =
     fieldErrors.password ??
     (activePassword.length === 0
@@ -172,6 +187,7 @@ export function LoginView() {
   function switchToSignIn() {
     setAuthMode("signIn");
     setPassword("");
+    setConfirmPassword("");
     setResetEmail("");
     setResetCode("");
     setResetNewPassword("");
@@ -185,16 +201,18 @@ export function LoginView() {
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       const formData = new FormData(e.currentTarget);
-      const email = String(formData.get("email") ?? resetEmail)
-        .trim()
-        .toLowerCase();
+      const submittedEmail = isFirstAdminSignup
+        ? FIRST_ADMIN_EMAIL
+        : String(formData.get("email") ?? email)
+            .trim()
+            .toLowerCase();
       const passwordValue = String(formData.get("password") ?? password);
       const nextFieldErrors: AuthFieldErrors = {};
 
       if (isResetRequest) {
-        if (!email) {
+        if (!submittedEmail) {
           nextFieldErrors.email = t("errors.emailRequired");
-        } else if (!EMAIL_PATTERN.test(email)) {
+        } else if (!EMAIL_PATTERN.test(submittedEmail)) {
           nextFieldErrors.email = t("errors.emailInvalid");
         }
         if (Object.keys(nextFieldErrors).length > 0) {
@@ -207,8 +225,8 @@ export function LoginView() {
         setError(null);
         setFieldErrors({});
         try {
-          await signIn("password", { flow: "reset", email });
-          setResetEmail(email);
+          await signIn("password", { flow: "reset", email: submittedEmail });
+          setResetEmail(submittedEmail);
           setResetInfo(t("resetCodeSent"));
           setAuthMode("resetVerify");
         } catch (err) {
@@ -260,13 +278,24 @@ export function LoginView() {
         return;
       }
 
-      if (!email) {
+      if (!submittedEmail) {
         nextFieldErrors.email = t("errors.emailRequired");
-      } else if (!EMAIL_PATTERN.test(email)) {
+      } else if (!EMAIL_PATTERN.test(submittedEmail)) {
         nextFieldErrors.email = t("errors.emailInvalid");
       }
       if (!passwordValue) {
         nextFieldErrors.password = t("errors.passwordRequired");
+      } else if (isFirstAdminSignup) {
+        if (passwordValue.length < 8) {
+          nextFieldErrors.password = t("errors.passwordTooShort");
+        } else if (!isPasswordAcceptableForSignUp(passwordValue)) {
+          nextFieldErrors.password = t("errors.passwordTooWeak");
+        }
+        if (!confirmPassword) {
+          nextFieldErrors.confirmPassword = t("errors.passwordRequired");
+        } else if (passwordValue !== confirmPassword) {
+          nextFieldErrors.confirmPassword = t("errors.resetPasswordMismatch");
+        }
       }
 
       if (Object.keys(nextFieldErrors).length > 0) {
@@ -280,12 +309,16 @@ export function LoginView() {
       setFieldErrors({});
       try {
         await signIn("password", {
-          flow: "signIn",
-          email,
+          flow: isFirstAdminSignup ? "signUp" : "signIn",
+          email: submittedEmail,
           password: passwordValue,
         });
       } catch (err) {
-        const authError = getAuthErrorMessage(err, errorCopy, "signIn");
+        const authError = getAuthErrorMessage(
+          err,
+          errorCopy,
+          isFirstAdminSignup ? "signUp" : "signIn",
+        );
         const serverFieldErrors: AuthFieldErrors = {};
         if (authError === t("errors.emailInvalid")) {
           serverFieldErrors.email = authError;
@@ -307,7 +340,10 @@ export function LoginView() {
       }
     },
     [
+      confirmPassword,
+      email,
       errorCopy,
+      isFirstAdminSignup,
       isResetRequest,
       isResetVerify,
       password,
@@ -323,19 +359,25 @@ export function LoginView() {
   const title =
     isResetRequest || isResetVerify
       ? t("resetPasswordTitle")
-      : STORE_NAME;
+      : isFirstAdminSignup
+        ? t("needAccount")
+        : STORE_NAME;
   const description =
     isResetRequest
       ? t("resetPasswordDescription")
       : isResetVerify
         ? t("resetVerifyDescription")
-        : t("loginDescription");
+        : isFirstAdminSignup
+          ? t("firstAdminDescription", { email: FIRST_ADMIN_EMAIL })
+          : t("loginDescription");
 
   const submitLabel = isResetRequest
     ? t("sendResetCode")
     : isResetVerify
       ? t("confirmResetPassword")
-      : t("signIn");
+      : isFirstAdminSignup
+        ? t("createAccount")
+        : t("signIn");
 
   return (
     <div className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden p-4 sm:p-6">
@@ -348,7 +390,7 @@ export function LoginView() {
         className="object-cover object-center"
       />
       <div
-        className="absolute inset-0 bg-slate-950/60 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-[#1c0809]/28 backdrop-blur-[0.5px]"
         aria-hidden
       />
 
@@ -402,12 +444,16 @@ export function LoginView() {
                     name="email"
                     type="email"
                     autoComplete="email"
-                    defaultValue={resetEmail}
+                    value={isResetVerify ? resetEmail : email}
+                    readOnly={isFirstAdminSignup}
                     aria-invalid={Boolean(fieldErrors.email)}
                     aria-describedby={
                       fieldErrors.email ? "login-email-error" : undefined
                     }
-                    onChange={() => clearFieldError("email")}
+                    onChange={(event) => {
+                      setEmail(event.target.value);
+                      clearFieldError("email");
+                    }}
                     placeholder={
                       locale === "ar" ? "أنت@مثال.كوم" : "vous@exemple.com"
                     }
@@ -537,7 +583,7 @@ export function LoginView() {
                   >
                     {t("password")}
                   </label>
-                  {authMode === "signIn" ? (
+                  {authMode === "signIn" && !isFirstAdminSignup ? (
                     <button
                       type="button"
                       className="text-primary text-xs font-bold hover:underline"
@@ -557,7 +603,7 @@ export function LoginView() {
                     className="text-outline pointer-events-none absolute top-1/2 left-3.5 z-10 size-5 -translate-y-1/2 stroke-[1.75]"
                     aria-hidden
                   />
-                  <Input
+                    <Input
                     id="login-password"
                     name="password"
                     type="password"
@@ -566,7 +612,9 @@ export function LoginView() {
                       setPassword(e.target.value);
                       clearFieldError("password");
                     }}
-                    autoComplete="current-password"
+                    autoComplete={
+                      isFirstAdminSignup ? "new-password" : "current-password"
+                    }
                     aria-invalid={passwordInvalid}
                     aria-describedby={
                       fieldErrors.password ? "login-password-error" : undefined
@@ -575,9 +623,57 @@ export function LoginView() {
                     className={authInputClassName(passwordInvalid)}
                   />
                 </div>
+                {isFirstAdminSignup ? (
+                  <PasswordStrengthIndicator
+                    password={password}
+                    invalid={passwordInvalid}
+                    message={passwordFeedbackMessage}
+                    labels={{
+                      weak: t("passwordStrength.weak"),
+                      medium: t("passwordStrength.medium"),
+                      strong: t("passwordStrength.strong"),
+                      hint: t("passwordStrength.hint"),
+                    }}
+                  />
+                ) : (
+                  <FieldError
+                    id="login-password-error"
+                    message={fieldErrors.password}
+                  />
+                )}
+              </div>
+            ) : null}
+
+            {isFirstAdminSignup ? (
+              <div className="space-y-2">
+                <label
+                  htmlFor="login-confirm-password"
+                  className="text-on-surface block text-xs font-bold tracking-wide uppercase"
+                >
+                  {t("resetConfirmPassword")}
+                </label>
+                <div className="relative">
+                  <Lock
+                    className="text-outline pointer-events-none absolute top-1/2 left-3.5 z-10 size-5 -translate-y-1/2 stroke-[1.75]"
+                    aria-hidden
+                  />
+                  <Input
+                    id="login-confirm-password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(event) => {
+                      setConfirmPassword(event.target.value);
+                      clearFieldError("confirmPassword");
+                    }}
+                    className={authInputClassName(
+                      Boolean(fieldErrors.confirmPassword),
+                    )}
+                  />
+                </div>
                 <FieldError
-                  id="login-password-error"
-                  message={fieldErrors.password}
+                  id="login-confirm-password-error"
+                  message={fieldErrors.confirmPassword}
                 />
               </div>
             ) : null}
@@ -591,7 +687,9 @@ export function LoginView() {
                 <p className="text-sm font-bold">
                   {isResetRequest || isResetVerify
                     ? t("resetPasswordTitle")
-                    : t("errorTitle")}
+                    : isFirstAdminSignup
+                      ? t("signUpErrorTitle")
+                      : t("errorTitle")}
                 </p>
                 <p className="mt-1 text-sm leading-snug font-medium">{error}</p>
               </div>
@@ -601,7 +699,7 @@ export function LoginView() {
               type="submit"
               disabled={isSubmitting}
               className={cn(
-                "from-primary to-primary-container text-on-primary mt-2 h-12 w-full rounded-xl bg-linear-to-br text-base font-bold shadow-[0_8px_20px_rgba(61,43,31,0.22)] transition-all",
+                "from-primary to-primary-container text-on-primary mt-2 h-12 w-full rounded-xl bg-linear-to-br text-base font-bold shadow-[0_8px_20px_rgba(122,21,24,0.22)] transition-all",
                 "hover:opacity-[0.96] active:scale-[0.99]",
               )}
             >

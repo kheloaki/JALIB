@@ -100,7 +100,7 @@ export function CollapsibleHeaderSearch({
             value={value}
             onChange={(event) => onChange(event.target.value)}
             placeholder={placeholder}
-            className="text-on-surface h-10 w-full rounded-full border-0 bg-white py-0 pr-10 pl-9 text-[13px] shadow-[0_2px_12px_rgba(61,43,31,0.06)] focus:ring-2 focus:ring-[#3d2b1f]/10 focus:outline-none"
+            className="text-on-surface h-10 w-full rounded-full border-0 bg-white py-0 pr-10 pl-9 text-[13px] shadow-[0_2px_12px_rgba(122,21,24,0.06)] focus:ring-2 focus:ring-[#7a1518]/10 focus:outline-none"
             aria-label={placeholder}
           />
           <kbd className="text-muted-foreground pointer-events-none absolute top-1/2 right-2.5 hidden -translate-y-1/2 text-[10px] font-medium sm:inline">

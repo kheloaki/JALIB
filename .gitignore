@@ -56,3 +56,36 @@ next-env.d.ts
 
 # Local product image-search exports
 /exports/
+
+# Local agent dumps — not part of the running app
+.claude/
+.agents/skills/convex-add/
+.agents/skills/convex-advisor/
+.agents/skills/convex-agent/
+.agents/skills/convex-auth/
+.agents/skills/convex-authz/
+.agents/skills/convex-backup/
+.agents/skills/convex-billing/
+.agents/skills/convex-cost/
+.agents/skills/convex-crons/
+.agents/skills/convex-deploy-guard/
+.agents/skills/convex-design/
+.agents/skills/convex-docs/
+.agents/skills/convex-domains/
+.agents/skills/convex-env/
+.agents/skills/convex-expert/
+.agents/skills/convex-explain-app/
+.agents/skills/convex-improve-convex-plugin/
+.agents/skills/convex-insights/
+.agents/skills/convex-launch-readiness/
+.agents/skills/convex-migrate-rehearse/
+.agents/skills/convex-migrate/
+.agents/skills/convex-monitor/
+.agents/skills/convex-optimize/
+.agents/skills/convex-reviewer/
+.agents/skills/convex-seed/
+.agents/skills/convex-self-heal/
+.agents/skills/convex-sentinel/
+.agents/skills/convex-suggest/
+.agents/skills/convex-test/
+.agents/skills/convex-verify/

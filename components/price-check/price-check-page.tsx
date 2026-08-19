@@ -98,7 +98,7 @@ export function PriceCheckPage() {
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-8">
         <header className="flex flex-col items-center gap-3 text-center">
           <StoreLogo
-            variant="full"
+            variant="white"
             size="lg"
             priority
             className="mx-auto max-w-[220px]"
@@ -137,8 +137,8 @@ export function PriceCheckPage() {
           </div>
         </header>
 
-        <section className="rounded-[28px] bg-white px-5 py-8 text-center shadow-[0_12px_40px_rgba(61,43,31,0.08)] sm:px-8">
-          <div className="text-primary mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-[rgba(61,43,31,0.08)]">
+        <section className="rounded-[28px] bg-white px-5 py-8 text-center shadow-[0_12px_40px_rgba(122,21,24,0.08)] sm:px-8">
+          <div className="text-primary mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-[rgba(122,21,24,0.08)]">
             <ScanBarcode className="size-8" aria-hidden />
           </div>
           <p className="text-on-surface text-xl font-bold sm:text-2xl">
@@ -179,7 +179,7 @@ export function PriceCheckPage() {
 
         <section
           className={cn(
-            "min-h-[14rem] rounded-[28px] bg-white p-6 shadow-[0_12px_40px_rgba(61,43,31,0.08)] sm:p-8",
+            "min-h-[14rem] rounded-[28px] bg-white p-6 shadow-[0_12px_40px_rgba(122,21,24,0.08)] sm:p-8",
             !lookupCode && "opacity-80",
           )}
           aria-live="polite"

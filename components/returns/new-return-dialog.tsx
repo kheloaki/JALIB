@@ -822,7 +822,7 @@ function ReturnFormStep({
               type="button"
               disabled={!anyQty || !canSubmitReturn || submitting}
               onClick={onConfirm}
-              className="from-primary to-primary-container text-on-primary h-12 w-full rounded-2xl bg-linear-to-br font-black shadow-[0_12px_28px_rgba(61,43,31,0.2)] disabled:opacity-50"
+              className="from-primary to-primary-container text-on-primary h-12 w-full rounded-2xl bg-linear-to-br font-black shadow-[0_12px_28px_rgba(122,21,24,0.2)] disabled:opacity-50"
             >
               {submitting
                 ? tr("Enregistrement…", "جاري الحفظ…")

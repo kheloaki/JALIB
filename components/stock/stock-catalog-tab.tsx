@@ -13,19 +13,23 @@ import { useConvex, useMutation, usePaginatedQuery, useQuery } from "convex/reac
 import type { LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import {
+  BookMarked,
+  BookOpen,
+  Briefcase,
   Cpu,
   History,
   Infinity,
   LayoutGrid,
   LayoutList,
   Layers,
+  Notebook,
+  Palette,
   Pencil,
   PlusCircle,
+  Ruler,
   ScanBarcode,
-  Sparkles,
   SquarePen,
   Trash2,
-  UtensilsCrossed,
 } from "lucide-react";
 
 import { useSearchParams, useRouter } from "next/navigation";
@@ -44,6 +48,7 @@ import { useAdminChrome } from "@/components/layout/admin-chrome-context";
 import { AdminFilterSummary } from "@/components/layout/admin-filter-summary";
 import { ProductCatalogImage } from "@/components/products/product-catalog-image";
 import type { PosCategory } from "@/components/pos/constants";
+import { CATALOG_CATEGORIES } from "@/lib/catalog/categories";
 import {
   PosProductContextMenu,
   type PosProductContextMenuState,
@@ -85,18 +90,44 @@ import { cn } from "@/lib/utils";
 const PAGE_SIZE = 50;
 
 const CATEGORY_ICONS: Partial<Record<string, LucideIcon>> = {
-  Alimentation: UtensilsCrossed,
-  Nettoyage: Sparkles,
-  Papeterie: Pencil,
-  Électronique: Cpu,
+  "Livres scolaires": BookOpen,
+  Lecture: BookMarked,
+  "Cahiers & papier": Notebook,
+  Écriture: Pencil,
+  "Sacs & trousses": Briefcase,
+  "Géométrie & calculatrices": Ruler,
+  "Arts plastiques": Palette,
+  Informatique: Cpu,
+};
+
+const CATEGORY_TAB_KEYS: Record<
+  string,
+  | "tabSchoolBooks"
+  | "tabReading"
+  | "tabNotebooks"
+  | "tabWriting"
+  | "tabBags"
+  | "tabGeometry"
+  | "tabArt"
+  | "tabComputing"
+> = {
+  "Livres scolaires": "tabSchoolBooks",
+  Lecture: "tabReading",
+  "Cahiers & papier": "tabNotebooks",
+  Écriture: "tabWriting",
+  "Sacs & trousses": "tabBags",
+  "Géométrie & calculatrices": "tabGeometry",
+  "Arts plastiques": "tabArt",
+  Informatique: "tabComputing",
 };
 
 const STATIC_SHELF_TABS: { id: PosCategory; label: string; icon: LucideIcon }[] = [
   { id: "Tout", label: "Tous", icon: Infinity },
-  { id: "Alimentation", label: "Alimentation", icon: UtensilsCrossed },
-  { id: "Nettoyage", label: "Nettoyage", icon: Sparkles },
-  { id: "Papeterie", label: "Papeterie", icon: Pencil },
-  { id: "Électronique", label: "Électronique", icon: Cpu },
+  ...CATALOG_CATEGORIES.map((id) => ({
+    id,
+    label: id,
+    icon: CATEGORY_ICONS[id] ?? LayoutGrid,
+  })),
 ];
 
 function shortSku(p: Product): string {
@@ -279,11 +310,8 @@ function StockCatalogTabContent() {
 
   const tabLabel = (id: string) => {
     if (id === "Tout") return t("tabAll");
-    if (id === "Alimentation") return t("tabFood");
-    if (id === "Nettoyage") return t("tabCleaning");
-    if (id === "Papeterie") return t("tabStationery");
-    if (id === "Électronique") return t("tabElectronics");
-    return id;
+    const key = CATEGORY_TAB_KEYS[id];
+    return key ? t(key) : id;
   };
 
   const shelfTabs = useMemo(() => {

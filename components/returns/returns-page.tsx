@@ -89,7 +89,7 @@ export function ReturnsPageContent() {
             <Button
               type="button"
               onClick={() => setNewReturnOpen(true)}
-              className="from-primary to-primary-container text-on-primary h-11 rounded-xl bg-linear-to-br px-5 font-black shadow-[0_8px_20px_rgba(61,43,31,0.18)]"
+              className="from-primary to-primary-container text-on-primary h-11 rounded-xl bg-linear-to-br px-5 font-black shadow-[0_8px_20px_rgba(122,21,24,0.18)]"
             >
               <Plus className="size-4 stroke-[2.5]" aria-hidden />
               {tr("Nouveau retour", "إرجاع جديد")}

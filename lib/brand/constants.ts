@@ -1,5 +1,5 @@
 /** Bump when logo assets in /public are regenerated (cache bust). */
-const LOGO_V = "5";
+const LOGO_V = "8";
 
 /** Icon-only mark (JM basket + stars) — collapsed sidebar, favicon */
 export const STORE_LOGO_ICON_PATH = `/jamaa-market-logo-icon.png?v=${LOGO_V}`;

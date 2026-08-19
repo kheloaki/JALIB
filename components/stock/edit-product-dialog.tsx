@@ -11,6 +11,7 @@ import { ProductPhotoField } from "@/components/products/product-photo-field";
 import { SoldByWeightField } from "@/components/products/sold-by-weight-field";
 import type { PosCategory } from "@/components/pos/constants";
 import { POS_CATEGORIES } from "@/components/pos/constants";
+import { DEFAULT_CATALOG_CATEGORY } from "@/lib/catalog/categories";
 import { PosAddCategoryDialog } from "@/components/pos/pos-add-category-dialog";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
@@ -96,7 +97,7 @@ export function EditProductDialog({
   const selectedCategory =
     category && productCategories.includes(category)
       ? category
-      : (productCategories[0] ?? "Alimentation");
+      : (productCategories[0] ?? DEFAULT_CATALOG_CATEGORY);
 
   useEffect(() => {
     if (!open || !product) return;

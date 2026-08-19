@@ -103,7 +103,7 @@ export function SkWhiteCard({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border border-[rgba(61,43,31,0.08)] bg-white shadow-[0_4px_20px_rgba(61,43,31,0.07)]",
+        "overflow-hidden rounded-xl border border-[rgba(122,21,24,0.08)] bg-white shadow-[0_4px_20px_rgba(122,21,24,0.07)]",
         className,
       )}
     >

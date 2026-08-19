@@ -15,11 +15,11 @@
     sans-serif;
   --font-mono: var(--font-inter), ui-monospace, monospace;
 
-  --color-on-primary-container: #f5ebe3;
-  --color-surface-tint: #3d2b1f;
+  --color-on-primary-container: #fceeee;
+  --color-surface-tint: #7a1518;
   --color-tertiary-container: #996100;
   --color-on-tertiary-container: #ffeedd;
-  --color-inverse-primary: #cbb9a8;
+  --color-inverse-primary: #e0b4b6;
   --color-on-error-container: #93000a;
   --color-surface-bright: #faf6f1;
   --color-on-tertiary: #ffffff;
@@ -33,23 +33,23 @@
   --color-outline-variant: #e0d5ca;
   --color-error-container: #ffdad6;
   --color-on-secondary-container: #00714d;
-  --color-on-primary-fixed-variant: #4a3425;
-  --color-primary-container: #5c4033;
+  --color-on-primary-fixed-variant: #5c1013;
+  --color-primary-container: #9b1c20;
   --color-secondary-fixed: #6ffbbe;
   --color-inverse-surface: #2d3133;
   --color-on-surface: #191c1e;
   --color-on-secondary-fixed: #002113;
-  --color-primary-fixed: #f0e8df;
+  --color-primary-fixed: #f8e8e8;
   --color-outline: #737686;
   --color-tertiary: #784b00;
   --color-secondary-container: #6cf8bb;
-  --color-on-primary-fixed: #2c1810;
+  --color-on-primary-fixed: #3f0c0e;
   --color-secondary: #006c49;
   --color-surface-container-highest: #e8ddd3;
   --color-tertiary-fixed-dim: #ffb95f;
   --color-on-tertiary-fixed: #2a1700;
   --color-surface-container: #f0e8df;
-  --color-primary-fixed-dim: #cbb9a8;
+  --color-primary-fixed-dim: #e0b4b6;
   --color-surface: #faf6f1;
   --color-on-error: #ffffff;
   --color-surface-variant: #e8ddd3;
@@ -58,7 +58,7 @@
   --color-inverse-on-surface: #eff1f3;
   --color-surface-container-high: #f0e8df;
   --color-tertiary-fixed: #ffddb8;
-  --color-primary: #3d2b1f;
+  --color-primary: #7a1518;
   --color-on-surface-variant: #434655;
   --color-on-secondary: #ffffff;
   --color-error: #ba1a1a;
@@ -110,48 +110,48 @@
 }
 
 :root {
-  /* Brown payflow shell */
-  --shell-canvas: #e8dfd6;
-  --shell-frame: #3d2b1f;
-  --shell-frame-border: #cbb9a8;
+  /* Library Jamaa shell — crimson shelves + paper surfaces */
+  --shell-canvas: #e9ddda;
+  --shell-frame: #7a1518;
+  --shell-frame-border: #e0b4b6;
   --shell-main: #faf6f1;
-  --shell-main-muted: #f0e8df;
-  --shell-brown-900: #3d2b1f;
-  --shell-brown-800: #4a3425;
-  --shell-brown-700: #5c4033;
-  --shell-brown-600: #7a5c44;
-  --shell-brown-tan: #e8ddd3;
+  --shell-main-muted: #f4e9e6;
+  --shell-brown-900: #7a1518;
+  --shell-brown-800: #8e1c20;
+  --shell-brown-700: #9b1c20;
+  --shell-brown-600: #b45a5c;
+  --shell-brown-tan: #e8d8d6;
   --shell-brown-cream: #faf6f1;
 
   --pos-header: var(--shell-main);
   --background: var(--shell-canvas);
-  --foreground: #2c1810;
+  --foreground: #2a1618;
   --card: #ffffff;
-  --card-foreground: #2c1810;
+  --card-foreground: #2a1618;
   --popover: #ffffff;
-  --popover-foreground: #2c1810;
-  --primary: #3d2b1f;
+  --popover-foreground: #2a1618;
+  --primary: #7a1518;
   --primary-foreground: #ffffff;
-  --secondary: #f0e8df;
-  --secondary-foreground: #3d2b1f;
-  --muted: #f0e8df;
-  --muted-foreground: #7a6558;
-  --accent: #f0e8df;
-  --accent-foreground: #3d2b1f;
+  --secondary: #f4e9e6;
+  --secondary-foreground: #7a1518;
+  --muted: #f4e9e6;
+  --muted-foreground: #8a5e60;
+  --accent: #f4e9e6;
+  --accent-foreground: #7a1518;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: #e0d5ca;
-  --input: #e0d5ca;
-  --ring: #cbb9a8;
-  --chart-1: #d4a574;
-  --chart-2: #3d2b1f;
+  --border: #e0d2d0;
+  --input: #e0d2d0;
+  --ring: #e0b4b6;
+  --chart-1: #c4a35a;
+  --chart-2: #7a1518;
   --chart-3: #6b8f5e;
   --chart-4: #9b7bb8;
   --chart-5: #c45c4a;
   --radius: 1.25rem;
-  --sidebar: #3d2b1f;
-  --sidebar-foreground: #f5ebe3;
+  --sidebar: #7a1518;
+  --sidebar-foreground: #fceeee;
   --sidebar-primary: #faf6f1;
-  --sidebar-primary-foreground: #3d2b1f;
+  --sidebar-primary-foreground: #7a1518;
   --sidebar-accent: rgba(255, 255, 255, 0.12);
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgba(255, 255, 255, 0.1);
@@ -207,12 +207,12 @@
 
 /* Payflow-inspired card utilities */
 .pf-card {
-  @apply rounded-[24px] border-0 bg-white shadow-[0_4px_20px_rgba(61,43,31,0.07)];
+  @apply rounded-[24px] border-0 bg-white shadow-[0_4px_20px_rgba(122,21,24,0.07)];
 }
 
 .pf-card-dark {
-  @apply rounded-[24px] border-0 text-white shadow-[0_8px_32px_rgba(44,24,16,0.28)];
-  background: linear-gradient(160deg, #5c4033 0%, #3d2b1f 55%, #2c1810 100%);
+  @apply rounded-[24px] border-0 text-white shadow-[0_8px_32px_rgba(63,12,14,0.28)];
+  background: linear-gradient(160deg, #a82428 0%, #7a1518 55%, #3f0c0e 100%);
 }
 
 /* Sheets & dialogs — warm borders on light surfaces (not sidebar white-alpha) */
@@ -229,15 +229,15 @@
 }
 
 [data-slot="dropdown-menu-content"] {
-  box-shadow: 0 4px 20px rgba(61, 43, 31, 0.1);
+  box-shadow: 0 4px 20px rgba(122, 21, 24, 0.1);
 }
 
 .pf-icon-btn {
-  @apply flex size-10 items-center justify-center rounded-full bg-white text-on-surface-variant shadow-[0_2px_8px_rgba(61,43,31,0.08)] transition-colors hover:bg-white/90;
+  @apply flex size-10 items-center justify-center rounded-full bg-white text-on-surface-variant shadow-[0_2px_8px_rgba(122,21,24,0.08)] transition-colors hover:bg-white/90;
 }
 
 [data-sidebar="sidebar"] {
-  background: linear-gradient(180deg, #4a3425 0%, #3d2b1f 48%, #2c1810 100%);
+  background: linear-gradient(180deg, #8e1c20 0%, #7a1518 48%, #3f0c0e 100%);
 }
 
 /* Payflow-style sidebar blocks */
@@ -323,7 +323,7 @@
 }
 
 .pf-search {
-  @apply w-full rounded-full border-0 bg-white py-3.5 pr-16 pl-12 text-[13px] shadow-[0_2px_12px_rgba(61,43,31,0.06)] focus:ring-2 focus:ring-[#3d2b1f]/10 focus:outline-none;
+  @apply w-full rounded-full border-0 bg-white py-3.5 pr-16 pl-12 text-[13px] shadow-[0_2px_12px_rgba(122,21,24,0.06)] focus:ring-2 focus:ring-[#7a1518]/10 focus:outline-none;
 }
 
 /* Outer full-width app shell — locked to viewport; only main pane scrolls */
@@ -512,7 +512,7 @@
     border-radius: 32px;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.65),
-      0 4px 24px rgba(61, 43, 31, 0.06);
+      0 4px 24px rgba(122, 21, 24, 0.06);
   }
 }
 
@@ -540,13 +540,13 @@
   border-radius: 24px;
   border: 0;
   background: #fff;
-  box-shadow: 0 4px 20px rgba(61, 43, 31, 0.07);
+  box-shadow: 0 4px 20px rgba(122, 21, 24, 0.07);
 }
 
 .pf-shell-main .rounded-2xl.border {
   border-radius: 24px;
-  border-color: rgba(61, 43, 31, 0.08) !important;
-  box-shadow: 0 4px 20px rgba(61, 43, 31, 0.05);
+  border-color: rgba(122, 21, 24, 0.08) !important;
+  box-shadow: 0 4px 20px rgba(122, 21, 24, 0.05);
 }
 
 /* Payflow tabs */
@@ -579,7 +579,7 @@
 .pf-tab-active {
   background: var(--primary);
   color: var(--primary-foreground);
-  box-shadow: 0 2px 8px rgba(61, 43, 31, 0.28);
+  box-shadow: 0 2px 8px rgba(122, 21, 24, 0.28);
 }
 
 .pf-tab-active:hover {
@@ -653,7 +653,7 @@
   gap: 2px;
   overflow: visible;
   border-radius: 9999px;
-  background: linear-gradient(180deg, #4a3425 0%, #3d2b1f 48%, #2c1810 100%);
+  background: linear-gradient(180deg, #8e1c20 0%, #7a1518 48%, #3f0c0e 100%);
   border: none;
   box-shadow: 0 10px 36px rgba(0, 0, 0, 0.38);
   padding: 8px 6px 6px;
@@ -777,16 +777,16 @@
 }
 
 .pos-cart-panel {
-  border-color: rgba(61, 43, 31, 0.08);
+  border-color: rgba(122, 21, 24, 0.08);
   background: #fff;
-  box-shadow: -8px 0 32px rgba(61, 43, 31, 0.08);
+  box-shadow: -8px 0 32px rgba(122, 21, 24, 0.08);
 }
 
 .pos-cart-footer {
   border-radius: 24px 24px 0 0;
-  border-top: 1px solid rgba(61, 43, 31, 0.06);
+  border-top: 1px solid rgba(122, 21, 24, 0.06);
   background: #fff;
-  box-shadow: 0 -8px 32px rgba(61, 43, 31, 0.08);
+  box-shadow: 0 -8px 32px rgba(122, 21, 24, 0.08);
 }
 
 /* Cashier color memory — payment + actions */
@@ -827,22 +827,22 @@
 
 .pos-product-card {
   border-radius: 12px;
-  border: 1px solid rgba(61, 43, 31, 0.1);
+  border: 1px solid rgba(122, 21, 24, 0.1);
   background: #fff;
   box-shadow: none;
   transition: box-shadow 0.15s, transform 0.12s, border-color 0.15s;
 }
 
 .pos-product-card:hover {
-  border-color: rgba(61, 43, 31, 0.22);
-  box-shadow: 0 4px 14px rgba(61, 43, 31, 0.08);
+  border-color: rgba(122, 21, 24, 0.22);
+  box-shadow: 0 4px 14px rgba(122, 21, 24, 0.08);
 }
 
 .pos-line-card {
   border-radius: 16px;
-  border: 1px solid rgba(61, 43, 31, 0.08);
+  border: 1px solid rgba(122, 21, 24, 0.08);
   background: #fff;
-  box-shadow: 0 2px 8px rgba(61, 43, 31, 0.04);
+  box-shadow: 0 2px 8px rgba(122, 21, 24, 0.04);
 }
 
 /* Internal invoice: screen preview vs print document */

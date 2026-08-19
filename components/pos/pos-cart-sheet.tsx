@@ -68,7 +68,7 @@ export function PosCartSheet({
         side="right"
         showCloseButton
         className={cn(
-          "border-border bg-card flex h-full max-h-svh w-full flex-col gap-0 overflow-hidden p-0 shadow-[-8px_0_32px_rgba(61,43,31,0.08)]",
+          "border-border bg-card flex h-full max-h-svh w-full flex-col gap-0 overflow-hidden p-0 shadow-[-8px_0_32px_rgba(122,21,24,0.08)]",
           "sm:max-w-[380px]",
         )}
       >

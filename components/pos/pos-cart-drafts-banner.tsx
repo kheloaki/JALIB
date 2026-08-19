@@ -84,7 +84,7 @@ export function PosCartDraftsBanner({
   return (
     <div
       className={cn(
-        "border-[var(--border)] bg-white flex shrink-0 items-center gap-1.5 border-b px-2 py-2 shadow-[0_2px_12px_rgba(61,43,31,0.05)] sm:gap-2 sm:px-3",
+        "border-[var(--border)] bg-white flex shrink-0 items-center gap-1.5 border-b px-2 py-2 shadow-[0_2px_12px_rgba(122,21,24,0.05)] sm:gap-2 sm:px-3",
         className,
       )}
     >

@@ -9,12 +9,14 @@ import {
 function product(partial: Partial<Product> & { id: string; name: string }): Product {
   return {
     price: 1,
-    category: "Alimentation",
+    category: "Livres scolaires",
     image: "",
     imageAlt: partial.name,
     stockQty: 1,
+    stockLabel: "1",
+    stockLow: false,
     ...partial,
-  };
+  } as Product;
 }
 
 describe("getProductSearchRank", () => {
