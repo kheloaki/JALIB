@@ -20,6 +20,10 @@ import {
 } from "@/lib/i18n/document-labels";
 import { formatMad } from "@/lib/money/mad";
 import { applyPdfFont, setupDocumentPdfFont } from "@/lib/pdf/document-pdf-font";
+import {
+  createAutoTableLocaleHooks,
+  writePdfAligned,
+} from "@/lib/pdf/pdf-text";
 
 const MARGIN_MM = 12;
 const PAGE_WIDTH_MM = 210;
@@ -132,11 +136,13 @@ export async function buildCreditStatementPdf(
   }
 
   if (legal.length > 0) {
-    applyPdfFont(doc, fonts, "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...MUTED_TEXT);
     for (const line of legal) {
-      doc.text(line, MARGIN_MM, y);
+      writePdfAligned(doc, line, MARGIN_MM, y, locale, fonts, {
+        align: "left",
+        fontSize: 8,
+        color: MUTED_TEXT,
+        maxWidth: CONTENT_WIDTH_MM,
+      });
       y += 4;
     }
     y += 2;
@@ -147,16 +153,30 @@ export async function buildCreditStatementPdf(
   doc.line(MARGIN_MM, y, rightX, y);
   y += 8;
 
-  applyPdfFont(doc, fonts, "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(0, 0, 0);
-  doc.text(credit.title, MARGIN_MM, y);
+  writePdfAligned(doc, credit.title, MARGIN_MM, y, locale, fonts, {
+    align: "left",
+    fontSize: 14,
+    style: "bold",
+    maxWidth: CONTENT_WIDTH_MM * 0.55,
+  });
 
-  applyPdfFont(doc, fonts, "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...MUTED_TEXT);
-  doc.text(credit.issuedOn(issuedOn), rightX, y, { align: "right" });
+  writePdfAligned(
+    doc,
+    credit.issuedOn(issuedOn),
+    rightX,
+    y,
+    locale,
+    fonts,
+    {
+      align: "right",
+      fontSize: 8,
+      color: MUTED_TEXT,
+      maxWidth: CONTENT_WIDTH_MM * 0.4,
+    },
+  );
   y += 8;
+
+  const tableHooks = createAutoTableLocaleHooks(locale, fonts);
 
   autoTable(doc, {
     startY: y,
@@ -191,6 +211,7 @@ export async function buildCreditStatementPdf(
       font: fonts.body,
     },
     bodyStyles: { fontStyle: "bold", font: fonts.body },
+    ...tableHooks,
   });
 
   y = doc.lastAutoTable.finalY + 4;
@@ -231,14 +252,18 @@ export async function buildCreditStatementPdf(
       2: { halign: "right", cellWidth: CONTENT_WIDTH_MM / 4 },
       3: { halign: "right", cellWidth: CONTENT_WIDTH_MM / 4, textColor: [180, 35, 24] },
     },
+    ...tableHooks,
   });
 
   y = doc.lastAutoTable.finalY + 6;
 
-  applyPdfFont(doc, fonts, "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(...MUTED_TEXT);
-  doc.text(credit.historyTitle, MARGIN_MM, y);
+  writePdfAligned(doc, credit.historyTitle, MARGIN_MM, y, locale, fonts, {
+    align: "left",
+    fontSize: 8,
+    style: "bold",
+    color: MUTED_TEXT,
+    maxWidth: CONTENT_WIDTH_MM,
+  });
   y += 3;
 
   const rows = sortedEntries(entries);
@@ -299,7 +324,7 @@ export async function buildCreditStatementPdf(
       },
       5: { cellWidth: HISTORY_COL_WIDTHS.status, halign: "center" },
     },
-    didParseCell(data) {
+    ...createAutoTableLocaleHooks(locale, fonts, (data) => {
       if (data.section === "body" && data.column.index === 4) {
         data.cell.styles.overflow = "hidden";
         data.cell.styles.halign = "right";
@@ -313,7 +338,7 @@ export async function buildCreditStatementPdf(
           }
         }
       }
-    },
+    }),
   });
 
   y = doc.lastAutoTable.finalY + 6;
@@ -322,14 +347,16 @@ export async function buildCreditStatementPdf(
   doc.line(MARGIN_MM, y, rightX, y);
   y += 5;
 
-  applyPdfFont(doc, fonts, "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(...MUTED_TEXT);
   const footer = credit.footer(
     client.fullName,
     formatMad(Math.max(0, summary.outstandingMad)),
   );
-  doc.text(footer, PAGE_WIDTH_MM / 2, y, { align: "center", maxWidth: CONTENT_WIDTH_MM });
+  writePdfAligned(doc, footer, PAGE_WIDTH_MM / 2, y, locale, fonts, {
+    align: "center",
+    fontSize: 7,
+    color: MUTED_TEXT,
+    maxWidth: CONTENT_WIDTH_MM,
+  });
 
   return doc;
 }

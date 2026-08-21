@@ -33,9 +33,11 @@ async function ensureCategory(ctx: MutationCtx, label: string) {
   });
 }
 
-/**
- * Upserts library CSV products by legacyId. Never writes stock quantities.
- */
+function normalizeBarcode(raw: string): string | undefined {
+  const normalized = raw.trim().replace(/\s+/g, "").toUpperCase();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
 export const importBatch = internalMutation({
   args: {
     products: v.array(productRow),
@@ -135,3 +137,80 @@ export const importBatch = internalMutation({
     };
   },
 });
+
+/**
+ * Sets barcodes on existing catalog rows. Never writes stock quantities.
+ */
+export const applyBarcodesBatch = internalMutation({
+  args: {
+    items: v.array(
+      v.object({
+        legacyId: v.string(),
+        barcode: v.string(),
+      }),
+    ),
+  },
+  returns: v.object({
+    processed: v.number(),
+    updated: v.number(),
+    unchanged: v.number(),
+    missing: v.number(),
+    conflicts: v.number(),
+    skipped: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    let updated = 0;
+    let unchanged = 0;
+    let missing = 0;
+    let conflicts = 0;
+    let skipped = 0;
+
+    for (const row of args.items) {
+      const legacyId = row.legacyId.trim();
+      const barcode = normalizeBarcode(row.barcode);
+      if (!legacyId || !barcode) {
+        skipped += 1;
+        continue;
+      }
+
+      const product = await ctx.db
+        .query("products")
+        .withIndex("by_legacyId", (q) => q.eq("legacyId", legacyId))
+        .unique();
+      if (!product) {
+        missing += 1;
+        continue;
+      }
+      if (product.barcode === barcode) {
+        unchanged += 1;
+        continue;
+      }
+
+      const taken = await ctx.db
+        .query("products")
+        .withIndex("by_barcode", (q) => q.eq("barcode", barcode))
+        .first();
+      if (taken && taken._id !== product._id) {
+        conflicts += 1;
+        continue;
+      }
+
+      await ctx.db.patch(product._id, {
+        barcode,
+        updatedAt: now,
+      });
+      updated += 1;
+    }
+
+    return {
+      processed: args.items.length,
+      updated,
+      unchanged,
+      missing,
+      conflicts,
+      skipped,
+    };
+  },
+});
+

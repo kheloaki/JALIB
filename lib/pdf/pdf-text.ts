@@ -11,6 +11,10 @@ import {
   type DocumentPdfFonts,
   PDF_LATIN_FONT,
 } from "@/lib/pdf/document-pdf-font";
+import {
+  isPdfArabicCanvasReady,
+  rasterizePdfArabicText,
+} from "@/lib/pdf/pdf-arabic-canvas";
 
 /** Arabic letters only (excludes Arabic-Indic digits). */
 const ARABIC_LETTER_RE =
@@ -81,6 +85,46 @@ const ARABIC_BLOCK_RE =
 
 export type PdfScriptRun = { text: string; arabic: boolean };
 
+function reverseGraphemes(text: string): string {
+  try {
+    const segmenter = new Intl.Segmenter("ar", { granularity: "grapheme" });
+    return Array.from(segmenter.segment(text), (part) => part.segment)
+      .reverse()
+      .join("");
+  } catch {
+    return Array.from(text).reverse().join("");
+  }
+}
+
+/**
+ * First strong character: Arabic product names use RTL so words stay in
+ * catalog order; Latin-leading mixed strings stay LTR.
+ */
+export function pdfParagraphDirection(text: string): "ltr" | "rtl" {
+  for (const ch of text) {
+    if (ARABIC_BLOCK_RE.test(ch)) return "rtl";
+    if (/[A-Za-z\u00C0-\u024F]/.test(ch)) return "ltr";
+  }
+  return "ltr";
+}
+
+/** Logical runs in left-to-right paint order (RTL names are not mirrored). */
+export function getPdfMixedPaintRuns(text: string): PdfScriptRun[] {
+  const logical = splitPdfScriptRuns(text);
+  if (pdfParagraphDirection(text) === "rtl") {
+    return [...logical].reverse();
+  }
+  return logical;
+}
+
+/**
+ * jsPDF draws left-to-right in string order. Presentation-form Arabic must
+ * be reversed so the name matches the catalog (not letter-flipped).
+ */
+export function arabicShapedToLtrDrawText(shaped: string): string {
+  return `\u202A${reverseGraphemes(shaped)}\u202C`;
+}
+
 /**
  * Split mixed FR/AR text so each run can use the right PDF font.
  * jsPDF drops Latin letters / mangling `()` when a whole mixed string is
@@ -127,6 +171,9 @@ function cellTextColor(
 /**
  * Draw exact product / label text with Noto for Arabic runs and Helvetica
  * for Latin/punctuation — avoids jsPDF clipping mixed strings to digits.
+ *
+ * Prefer canvas bitmap for Arabic: PDF viewers re-apply BiDi on shaped
+ * glyph strings and flip catalog names on ticket downloads.
  */
 export function drawPdfMixedText(
   doc: jsPDF,
@@ -137,35 +184,60 @@ export function drawPdfMixedText(
   options: {
     align?: "left" | "center" | "right";
     fontSize?: number;
+    style?: "normal" | "bold";
     maxWidth?: number;
     color?: [number, number, number];
   } = {},
 ): void {
-  const fontSize = options.fontSize ?? 10;
   const align = options.align ?? "left";
-  doc.setFontSize(fontSize);
+  const style = options.style ?? "normal";
+  const fontSize = options.fontSize ?? 10;
+  if (options.fontSize != null) doc.setFontSize(options.fontSize);
   if (options.color) doc.setTextColor(...options.color);
 
+  // Ticket PDFs: paint every string via Noto canvas (FR + AR) when available.
+  if (isPdfArabicCanvasReady()) {
+    const image = rasterizePdfArabicText(text, {
+      fontSizePt: fontSize,
+      bold: style === "bold",
+      maxWidthMm: options.maxWidth,
+      color: options.color,
+      align,
+    });
+    if (image) {
+      let drawX = x;
+      if (align === "right") drawX = x - image.widthMm;
+      else if (align === "center") drawX = x - image.widthMm / 2;
+      const drawY = y - image.heightMm * 0.72;
+      doc.addImage(
+        image.dataUrl,
+        "PNG",
+        drawX,
+        drawY,
+        image.widthMm,
+        image.heightMm,
+      );
+      return;
+    }
+  }
+
   if (!needsArabicPdfFont(text)) {
-    doc.setFont(PDF_LATIN_FONT, "normal");
+    doc.setFont(PDF_LATIN_FONT, style);
     doc.text(text, x, y, { align, maxWidth: options.maxWidth });
     return;
   }
 
-  const runs = splitPdfScriptRuns(text).map((run) => {
+  const runs = getPdfMixedPaintRuns(text).map((run) => {
     if (run.arabic) {
       const shaped = shapeArabicForPdf(run.text);
-      // LTR embedding keeps exact logical order (parens / mixed Latin)
-      // — plain Noto draw lets jsPDF BiDi drop or reorder characters.
-      const draw = `\u202A${shaped}\u202C`;
-      doc.setFont(fonts.body, "normal");
+      doc.setFont(fonts.body, style);
       return {
-        draw,
+        draw: arabicShapedToLtrDrawText(shaped),
         font: fonts.body,
         width: doc.getTextWidth(shaped),
       };
     }
-    doc.setFont(PDF_LATIN_FONT, "normal");
+    doc.setFont(PDF_LATIN_FONT, style);
     return {
       draw: run.text,
       font: PDF_LATIN_FONT,
@@ -182,8 +254,11 @@ export function drawPdfMixedText(
   let remaining = maxWidth;
   for (const run of runs) {
     if (remaining <= 0.2) break;
-    doc.setFont(run.font, "normal");
-    doc.text(run.draw, cursor, y);
+    doc.setFont(run.font, style);
+    // jsPDF supports R2L at runtime; typings omit it.
+    doc.text(run.draw, cursor, y, { R2L: false } as Parameters<
+      jsPDF["text"]
+    >[3]);
     const used = Math.min(run.width, remaining);
     cursor += used;
     remaining -= used;
@@ -295,11 +370,7 @@ export function writePdfTextLine(
   fonts: DocumentPdfFonts,
   options: PdfTextLineOptions = {},
 ): void {
-  const font = fontForPdfText(text, locale, fonts);
-  const content =
-    font === fonts.body ? prepareArabicPdfText(text) : text;
-  doc.setFont(font, "normal");
-  doc.text(content, x, y, {
+  drawPdfMixedText(doc, text, x, y, fonts, {
     align: options.align,
     maxWidth: options.maxWidth,
   });
@@ -318,22 +389,20 @@ export function writePdfArabicFooter(
   applyPdfFont(doc, fonts, "normal");
   doc.setFontSize(7);
 
-  if (locale === "ar") {
-    writePdfTextLine(doc, arabicLine, pageCenterX, y, locale, fonts, {
+  if (arabicLine.trim()) {
+    writePdfTextLine(doc, arabicLine.trim(), pageCenterX, y, locale, fonts, {
       align: "center",
       maxWidth,
     });
     y += 4;
-    doc.setFont(PDF_LATIN_FONT, "normal");
-    doc.text(metaLine, pageCenterX, y, { align: "center", maxWidth });
-    return y;
   }
-
-  doc.setFont(fonts.body, "normal");
-  doc.text(`${arabicLine} ${metaLine}`.trim(), pageCenterX, y, {
-    align: "center",
-    maxWidth,
-  });
+  if (metaLine.trim()) {
+    writePdfLatinText(doc, metaLine.trim(), pageCenterX, y, {
+      align: "center",
+      fontSize: 7,
+      maxWidth,
+    });
+  }
   return y;
 }
 
@@ -357,13 +426,12 @@ export function writePdfCentered(
   const pageCenterX =
     options.pageCenterX ?? doc.internal.pageSize.getWidth() / 2;
   const maxWidth = options.maxWidth ?? doc.internal.pageSize.getWidth();
-  const font = fontForPdfText(text, locale, fonts);
-  const content =
-    font === fonts.body ? prepareArabicPdfText(text) : text;
-
-  doc.setFontSize(fontSize);
-  doc.setFont(font, style);
-  doc.text(content, pageCenterX, y, { align: "center", maxWidth });
+  drawPdfMixedText(doc, text, pageCenterX, y, fonts, {
+    align: "center",
+    fontSize,
+    style,
+    maxWidth,
+  });
 }
 
 type PdfRowOptions = {
@@ -393,27 +461,19 @@ export function writePdfRow(
   doc.setFontSize(fontSize);
   doc.setTextColor(...muted);
 
-  const leftFont = fontForPdfText(left, locale, fonts);
-  doc.setFont(leftFont, "normal");
-  doc.text(
-    leftFont === fonts.body ? prepareArabicPdfText(left) : left,
-    margin,
-    y,
-    { maxWidth: contentWidth * 0.45 },
-  );
+  drawPdfMixedText(doc, left, margin, y, fonts, {
+    align: "left",
+    fontSize,
+    maxWidth: contentWidth * 0.45,
+  });
 
   doc.setTextColor(0, 0, 0);
-  const rightFont = fontForPdfText(right, locale, fonts);
-  doc.setFont(rightFont, rightBold ? "bold" : "normal");
-  doc.text(
-    rightFont === fonts.body ? prepareArabicPdfText(right) : right,
-    pageWidth - margin,
-    y,
-    {
-      align: "right",
-      maxWidth: contentWidth * 0.55,
-    },
-  );
+  drawPdfMixedText(doc, right, pageWidth - margin, y, fonts, {
+    align: "right",
+    fontSize,
+    style: rightBold ? "bold" : "normal",
+    maxWidth: contentWidth * 0.55,
+  });
 }
 
 export function writePdfAligned(
@@ -431,18 +491,12 @@ export function writePdfAligned(
     color?: [number, number, number];
   } = {},
 ): void {
-  const fontSize = options.fontSize ?? 7;
-  const style = options.style ?? "normal";
-  const font = fontForPdfText(text, locale, fonts);
-  const content =
-    font === fonts.body ? prepareArabicPdfText(text) : text;
-
-  doc.setFontSize(fontSize);
-  if (options.color) doc.setTextColor(...options.color);
-  doc.setFont(font, style);
-  doc.text(content, x, y, {
+  drawPdfMixedText(doc, text, x, y, fonts, {
     align: options.align,
+    fontSize: options.fontSize ?? 7,
+    style: options.style ?? "normal",
     maxWidth: options.maxWidth,
+    color: options.color,
   });
 }
 
@@ -465,20 +519,35 @@ export function writePdfTotalLine(
   if (locale === "ar") {
     doc.setFont(PDF_LATIN_FONT, "bold");
     const amountWidth = doc.getTextWidth(amount);
-    doc.setFont(fonts.body, "bold");
-    const currencyPrepared = prepareArabicPdfText(currencyWord);
-    const currencyWidth = doc.getTextWidth(currencyPrepared);
     const gap = 1.5;
+    // Approximate currency width from canvas when ready; else shaped width.
+    let currencyWidth = 8;
+    if (isPdfArabicCanvasReady()) {
+      const sample = rasterizePdfArabicText(currencyWord, {
+        fontSizePt: fontSize,
+        bold: true,
+      });
+      currencyWidth = sample?.widthMm ?? currencyWidth;
+    } else {
+      doc.setFont(fonts.body, "bold");
+      currencyWidth = doc.getTextWidth(shapeArabicForPdf(currencyWord));
+    }
     const startX = pageCenterX - (amountWidth + gap + currencyWidth) / 2;
     doc.setFont(PDF_LATIN_FONT, "bold");
     doc.text(amount, startX, y);
-    doc.setFont(fonts.body, "bold");
-    doc.text(currencyPrepared, startX + amountWidth + gap, y);
+    drawPdfMixedText(doc, currencyWord, startX + amountWidth + gap, y, fonts, {
+      align: "left",
+      fontSize,
+      style: "bold",
+    });
     return;
   }
 
-  doc.setFont(fonts.body, "bold");
-  doc.text(`${amount} ${currencyWord}`, pageCenterX, y, { align: "center" });
+  drawPdfMixedText(doc, `${amount} ${currencyWord}`, pageCenterX, y, fonts, {
+    align: "center",
+    fontSize,
+    style: "bold",
+  });
 }
 
 export function writePdfLatinText(
@@ -494,9 +563,38 @@ export function writePdfLatinText(
     color?: [number, number, number];
   } = {},
 ): void {
-  doc.setFontSize(options.fontSize ?? 7);
+  const fontSize = options.fontSize ?? 7;
+  const style = options.style ?? "normal";
+  const align = options.align ?? "left";
   if (options.color) doc.setTextColor(...options.color);
-  doc.setFont(PDF_LATIN_FONT, options.style ?? "normal");
+
+  if (isPdfArabicCanvasReady()) {
+    const image = rasterizePdfArabicText(text, {
+      fontSizePt: fontSize,
+      bold: style === "bold",
+      maxWidthMm: options.maxWidth,
+      color: options.color,
+      align,
+    });
+    if (image) {
+      let drawX = x;
+      if (align === "right") drawX = x - image.widthMm;
+      else if (align === "center") drawX = x - image.widthMm / 2;
+      const drawY = y - image.heightMm * 0.72;
+      doc.addImage(
+        image.dataUrl,
+        "PNG",
+        drawX,
+        drawY,
+        image.widthMm,
+        image.heightMm,
+      );
+      return;
+    }
+  }
+
+  doc.setFontSize(fontSize);
+  doc.setFont(PDF_LATIN_FONT, style);
   doc.text(text, x, y, {
     align: options.align,
     maxWidth: options.maxWidth,
@@ -517,12 +615,12 @@ export function writePdfArabicText(
     color?: [number, number, number];
   } = {},
 ): void {
-  doc.setFontSize(options.fontSize ?? 7);
-  if (options.color) doc.setTextColor(...options.color);
-  doc.setFont(fonts.body, options.style ?? "normal");
-  doc.text(prepareArabicPdfText(text), x, y, {
+  drawPdfMixedText(doc, text, x, y, fonts, {
     align: options.align,
+    fontSize: options.fontSize ?? 7,
+    style: options.style ?? "normal",
     maxWidth: options.maxWidth,
+    color: options.color,
   });
 }
 

@@ -4,7 +4,8 @@
  *
  * Usage:
  *   node scripts/import-library-csv.mjs /path/to/produits_complet.csv
- *   node scripts/import-library-csv.mjs /path/to/produits_complet.csv --dry-run
+ *   node scripts/import-library-csv.mjs /path/to/produits_complet.csv --prod
+ *   node scripts/import-library-csv.mjs --barcodes /path/to/produits_codebar.csv --prod
  */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -17,10 +18,12 @@ const BATCH = 80;
 
 const argv = process.argv.slice(2);
 const dryRun = argv.includes("--dry-run");
+const useProd = argv.includes("--prod");
+const barcodesOnly = argv.includes("--barcodes");
 const csvPath = argv.find((arg) => !arg.startsWith("--"));
 if (!csvPath) {
   throw new Error(
-    "Usage: node scripts/import-library-csv.mjs /path/to/produits_complet.csv [--dry-run]",
+    "Usage: node scripts/import-library-csv.mjs /path/to/produits_complet.csv [--prod] [--dry-run]",
   );
 }
 
@@ -355,11 +358,41 @@ function loadProducts(filePath) {
   return { products, categories: Object.fromEntries(categories), rawRows: lines.length - 1 };
 }
 
+function loadBarcodes(filePath) {
+  const text = fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
+  const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  const header = parseCsvLine(lines[0] ?? "");
+  const codeIdx = header.findIndex((col) =>
+    col.toLowerCase().includes("code bar"),
+  );
+  if (!header[1]?.includes("المنتوج") || codeIdx < 0) {
+    throw new Error(`Unexpected barcode CSV header in ${filePath}: ${header.join(",")}`);
+  }
+
+  const seen = new Set();
+  const items = [];
+  for (const line of lines.slice(1)) {
+    const cols = parseCsvLine(line);
+    const name = (cols[1] ?? "").trim().replace(/\s+/g, " ");
+    const barcode = (cols[codeIdx] ?? "").trim().replace(/\s+/g, "");
+    if (!name || !barcode) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push({
+      legacyId: `complet:${key}`,
+      barcode,
+    });
+  }
+
+  return { items, rawRows: lines.length - 1 };
+}
+
 function convexRun(functionPath, jsonArgs) {
-  const result = spawnSync(
-    "npx",
-    ["convex", "run", functionPath, JSON.stringify(jsonArgs)],
-    {
+  const cmdArgs = ["convex", "run"];
+  if (useProd) cmdArgs.push("--prod");
+  cmdArgs.push(functionPath, JSON.stringify(jsonArgs));
+  const result = spawnSync("npx", cmdArgs, {
       cwd: ROOT,
       encoding: "utf8",
       maxBuffer: 10 * 1024 * 1024,
@@ -383,6 +416,66 @@ function main() {
     throw new Error(`CSV not found: ${abs}`);
   }
 
+  if (barcodesOnly) {
+    const { items, rawRows } = loadBarcodes(abs);
+    console.log(
+      JSON.stringify(
+        {
+          file: abs,
+          rawRows,
+          uniqueBarcodes: items.length,
+          prod: useProd,
+          dryRun,
+          sample: items.slice(0, 3),
+        },
+        null,
+        2,
+      ),
+    );
+    if (dryRun) {
+      console.log("Dry run only — no Convex writes.");
+      return;
+    }
+
+    let updated = 0;
+    let unchanged = 0;
+    let missing = 0;
+    let conflicts = 0;
+    let skipped = 0;
+    for (let i = 0; i < items.length; i += BATCH) {
+      const slice = items.slice(i, i + BATCH);
+      const result = convexRun("libraryCsvImport:applyBarcodesBatch", {
+        items: slice,
+      });
+      updated += result.updated ?? 0;
+      unchanged += result.unchanged ?? 0;
+      missing += result.missing ?? 0;
+      conflicts += result.conflicts ?? 0;
+      skipped += result.skipped ?? 0;
+      console.log(
+        `barcodes ${Math.min(i + BATCH, items.length)}/${items.length}`,
+        result,
+      );
+    }
+
+    console.log(
+      JSON.stringify(
+        {
+          done: true,
+          updated,
+          unchanged,
+          missing,
+          conflicts,
+          skipped,
+          total: items.length,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
   const { products, categories, rawRows } = loadProducts(abs);
   console.log(
     JSON.stringify(
@@ -391,6 +484,7 @@ function main() {
         rawRows,
         uniqueProducts: products.length,
         categories,
+        prod: useProd,
         dryRun,
         sample: products.slice(0, 3),
       },

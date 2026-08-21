@@ -2,11 +2,16 @@ import type { jsPDF } from "jspdf";
 
 import type { DocumentLocale } from "@/lib/i18n/document-labels";
 
+import { ensureArabicCanvasFont } from "@/lib/pdf/arabic-canvas-font";
+
 export const PDF_ARABIC_FONT = "NotoSansArabic";
-export const PDF_LATIN_FONT = "helvetica";
+/** Ticket / document Latin — same Noto family as thermal soft fallback. */
+export const PDF_LATIN_FONT = "NotoSans";
 
 const ARABIC_REGULAR_FILE = "NotoSansArabic-Regular.ttf";
 const ARABIC_BOLD_FILE = "NotoSansArabic-Bold.ttf";
+const LATIN_REGULAR_FILE = "NotoSans-Regular.ttf";
+const LATIN_BOLD_FILE = "NotoSans-Bold.ttf";
 
 const fontCache = new Map<string, string>();
 
@@ -33,14 +38,23 @@ async function loadFontBase64(path: string): Promise<string> {
   return base64;
 }
 
-async function registerArabicFonts(doc: jsPDF): Promise<void> {
-  const regular = await loadFontBase64(`/fonts/${ARABIC_REGULAR_FILE}`);
-  const bold = await loadFontBase64(`/fonts/${ARABIC_BOLD_FILE}`);
+async function registerTicketFonts(doc: jsPDF): Promise<void> {
+  const [arRegular, arBold, laRegular, laBold] = await Promise.all([
+    loadFontBase64(`/fonts/${ARABIC_REGULAR_FILE}`),
+    loadFontBase64(`/fonts/${ARABIC_BOLD_FILE}`),
+    loadFontBase64(`/fonts/${LATIN_REGULAR_FILE}`),
+    loadFontBase64(`/fonts/${LATIN_BOLD_FILE}`),
+  ]);
 
-  doc.addFileToVFS(ARABIC_REGULAR_FILE, regular);
-  doc.addFileToVFS(ARABIC_BOLD_FILE, bold);
+  doc.addFileToVFS(ARABIC_REGULAR_FILE, arRegular);
+  doc.addFileToVFS(ARABIC_BOLD_FILE, arBold);
   doc.addFont(ARABIC_REGULAR_FILE, PDF_ARABIC_FONT, "normal");
   doc.addFont(ARABIC_BOLD_FILE, PDF_ARABIC_FONT, "bold");
+
+  doc.addFileToVFS(LATIN_REGULAR_FILE, laRegular);
+  doc.addFileToVFS(LATIN_BOLD_FILE, laBold);
+  doc.addFont(LATIN_REGULAR_FILE, PDF_LATIN_FONT, "normal");
+  doc.addFont(LATIN_BOLD_FILE, PDF_LATIN_FONT, "bold");
 }
 
 export type DocumentPdfFonts = {
@@ -52,9 +66,8 @@ export async function setupDocumentPdfFont(
   doc: jsPDF,
   _locale: DocumentLocale,
 ): Promise<DocumentPdfFonts> {
-  // Always register Arabic so mixed FR/AR product names and titles render
-  // even when the admin UI / document locale is French.
-  await registerArabicFonts(doc);
+  await registerTicketFonts(doc);
+  await ensureArabicCanvasFont().catch(() => undefined);
   return { body: PDF_ARABIC_FONT, bold: PDF_ARABIC_FONT };
 }
 

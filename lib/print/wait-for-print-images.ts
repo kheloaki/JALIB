@@ -67,7 +67,7 @@ function applyPrintPageStyle(mode: "client" | "owner" | "document") {
   const style = document.createElement("style");
   style.setAttribute("data-print-page-style", mode);
   if (mode === "client") {
-    // Thermal ticket — 80mm roll, minimal margins for ESC/POS-style drivers
+    // Thermal ticket — WD8260 80mm roll
     style.textContent = `
       @page {
         size: 80mm auto;

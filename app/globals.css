@@ -2,6 +2,35 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+@font-face {
+  font-family: "Noto Sans";
+  src: url("/fonts/NotoSans-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans";
+  src: url("/fonts/NotoSans-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans Arabic";
+  src: url("/fonts/NotoSansArabic-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans Arabic";
+  src: url("/fonts/NotoSansArabic-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 /* Design tokens from Google Stitch export (Point de Vente) */
@@ -982,8 +1011,25 @@
   [data-print-root][data-copy-mode="client"] .thermal-ticket,
   #invoice-print-area[data-copy-mode="client"] .thermal-ticket {
     width: 100% !important;
-    max-width: 72mm !important;
+    max-width: 76mm !important;
     color: #000 !important;
+    font-family:
+      "Noto Sans Arabic",
+      "Noto Sans",
+      var(--font-arabic),
+      "IBM Plex Sans Arabic",
+      "Segoe UI",
+      Tahoma,
+      sans-serif !important;
+    font-weight: 700 !important;
+    font-synthesis: none !important;
+  }
+
+  [data-print-root][data-copy-mode="client"] .thermal-ticket *,
+  #invoice-print-area[data-copy-mode="client"] .thermal-ticket * {
+    font-family: inherit !important;
+    color: #000 !important;
+    opacity: 1 !important;
   }
 
   [data-print-root][data-copy-mode="client"] img,

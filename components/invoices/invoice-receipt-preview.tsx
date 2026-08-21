@@ -66,24 +66,24 @@ function ClientReceipt({ invoice, settings }: ReceiptBodyProps) {
 
   return (
     <div
-      dir={labels.dir}
+      dir="ltr"
       lang={labels.lang}
       className={cn(
-        "thermal-ticket font-sans text-black",
-        labels.locale === "ar" && "font-[family-name:var(--font-arabic)]",
+        "thermal-ticket text-black",
+        "font-[family-name:var(--font-arabic),ui-sans-serif,system-ui,sans-serif]",
       )}
     >
-      <div className="space-y-0.5 border-b border-dashed border-black/40 pb-2 text-center">
+      <div className="space-y-1 border-b border-dashed border-black pb-2 text-center">
         <StoreLogo
           variant="print"
           size="thermal"
           priority
           className="mx-auto mb-1 max-w-[48mm]"
         />
-        <p className="text-[9px] font-black tracking-wide uppercase">
+        <p className="text-[11px] font-black tracking-wide uppercase">
           {inv.clientCopyTitle}
         </p>
-        <div className="text-[8px] leading-tight text-black/70">
+        <div className="text-[9px] leading-tight font-semibold text-black">
           {settings.storeAddress ? <p>{settings.storeAddress}</p> : null}
           {settings.storePhone ? (
             <p dir="ltr">
@@ -93,12 +93,10 @@ function ClientReceipt({ invoice, settings }: ReceiptBodyProps) {
         </div>
       </div>
 
-      <div className="space-y-0 border-b border-dashed border-black/40 py-2 text-[10px] leading-tight">
+      <div className="space-y-0.5 border-b border-dashed border-black py-2 text-[11px] leading-tight font-bold">
         <div className="flex justify-between gap-2">
           <span>{inv.invoiceNumber}</span>
-          <span className="font-mono font-bold tabular-nums">
-            #{invoice.number}
-          </span>
+          <span className="font-mono tabular-nums">#{invoice.number}</span>
         </div>
         <div className="flex justify-between gap-2">
           <span>{inv.dateTime}</span>
@@ -108,41 +106,46 @@ function ClientReceipt({ invoice, settings }: ReceiptBodyProps) {
         </div>
         <div className="flex justify-between gap-2">
           <span>{inv.customer}</span>
-          <span className="max-w-[55%] truncate font-bold">
+          <span className="max-w-[55%] truncate font-black" dir="auto">
             {invoice.clientName}
           </span>
         </div>
         <div className="flex justify-between gap-2">
           <span>{inv.payment}</span>
-          <span className="font-bold">
+          <span className="font-black">
             {paymentTypeLabel(invoice.paymentType, labels.locale)}
           </span>
         </div>
       </div>
 
-      <div className="border-b border-dashed border-black/40 py-2">
-        <ul className="space-y-1.5">
+      <div className="border-b border-dashed border-black py-2">
+        <ul className="space-y-2">
           {invoice.lines.map((line, idx) => {
             const qty = invoiceRemainingQty(line);
             const lineTotal =
               Math.round(line.unitPriceMad * qty * 100) / 100;
             return (
-              <li key={`${line.nameAr}:${idx}`} className="text-[10px] leading-snug">
-                <p className="font-medium break-words">{line.nameAr}</p>
+              <li
+                key={`${line.nameAr}:${idx}`}
+                className="text-[12px] leading-snug"
+              >
+                <p className="font-black break-words text-black" dir="auto">
+                  {line.nameAr}
+                </p>
                 {(line.returnedQty ?? 0) > 0 ? (
-                  <p className="text-[8px] text-black/60">
+                  <p className="text-[9px] font-bold text-black">
                     {inv.returnedQty(line.returnedQty ?? 0)}
                   </p>
                 ) : null}
                 <div
-                  className="mt-0.5 flex justify-between gap-2 font-mono tabular-nums text-black/80"
+                  className="mt-0.5 flex justify-between gap-2 font-mono text-[11px] font-bold tabular-nums text-black"
                   dir="ltr"
                 >
                   <span>
-                    {qty} × {formatReceiptMoney(line.unitPriceMad, labels.locale)}
+                    {qty} x {formatReceiptMoney(line.unitPriceMad, "fr")}
                   </span>
-                  <span className="font-bold text-black">
-                    {formatReceiptMoney(lineTotal, labels.locale)}
+                  <span className="font-black">
+                    {formatReceiptMoney(lineTotal, "fr")}
                   </span>
                 </div>
               </li>
@@ -151,23 +154,27 @@ function ClientReceipt({ invoice, settings }: ReceiptBodyProps) {
         </ul>
       </div>
 
-      <div className="border-b border-dashed border-black/40 py-2">
+      <div className="border-b border-dashed border-black py-2">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-[10px] font-bold uppercase">{inv.totalTtc}</span>
-          <span className="font-mono text-lg font-black tabular-nums" dir="ltr">
-            {formatReceiptMoney(invoice.totalMad, labels.locale)}{" "}
-            <span className="text-xs font-bold">{labels.currencyWord}</span>
+          <span className="text-[11px] font-black uppercase">{inv.totalTtc}</span>
+          <span
+            className="font-mono text-xl font-black tabular-nums text-black"
+            dir="ltr"
+          >
+            {formatReceiptMoney(invoice.totalMad, "fr")}
           </span>
         </div>
         {showBalance ? (
-          <div className="mt-1.5 space-y-0.5 text-[10px] font-mono tabular-nums">
-            <div className="flex justify-between gap-2" dir="ltr">
-              <span>{inv.paidLabel}</span>
-              <span>{formatReceiptMoney(paidMad, labels.locale)}</span>
+          <div className="mt-1.5 space-y-0.5 text-[11px] font-black font-mono tabular-nums text-black">
+            <div className="flex justify-between gap-2">
+              <span dir="auto">{inv.paidLabel}</span>
+              <span dir="ltr">{formatReceiptMoney(paidMad, "fr")}</span>
             </div>
-            <div className="flex justify-between gap-2 font-bold" dir="ltr">
-              <span>{inv.remainingLabel}</span>
-              <span>{formatReceiptMoney(remainingMad, labels.locale)}</span>
+            <div className="flex justify-between gap-2">
+              <span dir="auto">{inv.remainingLabel}</span>
+              <span dir="ltr">
+                {formatReceiptMoney(remainingMad, "fr")}
+              </span>
             </div>
           </div>
         ) : null}
@@ -202,7 +209,7 @@ function ClientReceipt({ invoice, settings }: ReceiptBodyProps) {
       ) : null}
 
       {settings.receiptFooter ? (
-        <p className="mt-2 text-center text-[8px] leading-tight text-black/70">
+        <p className="mt-2 text-center text-[9px] leading-tight font-bold text-black">
           {settings.receiptFooter}
         </p>
       ) : null}

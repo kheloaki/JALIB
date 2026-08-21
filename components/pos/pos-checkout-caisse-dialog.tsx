@@ -319,7 +319,7 @@ export function PosCheckoutCaisseDialog({
     void (async () => {
       if (mode === "client" && isThermalPrinterActive()) {
         try {
-          const payload = buildClientReceiptEscPos(printInvoice, {
+          const payload = await buildClientReceiptEscPos(printInvoice, {
             businessName: receiptSettings.businessName,
             storePhone: receiptSettings.storePhone,
             storeAddress: receiptSettings.storeAddress,

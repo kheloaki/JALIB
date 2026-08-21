@@ -23,7 +23,7 @@ import {
 } from "@/lib/pdf/document-pdf-font";
 import {
   createAutoTableLocaleHooks,
-  preparePdfText,
+  writePdfAligned,
   writePdfArabicFooter,
 } from "@/lib/pdf/pdf-text";
 
@@ -76,13 +76,6 @@ function tableLocaleStyles(locale: InternalInvoiceSettings["documentLocale"]) {
     styles: { halign: "right" as const },
     headStyles: { halign: "right" as const },
   };
-}
-
-function pdfCellText(
-  text: string,
-  locale: InternalInvoiceSettings["documentLocale"],
-): string {
-  return preparePdfText(text, locale);
 }
 
 function autoTableLocaleHooks(
@@ -143,11 +136,14 @@ function drawFactureHeader(
 
   let leftY = leftContentBottomY;
   if (legal.length > 0) {
-    applyPdfFont(doc, fonts, "normal");
     doc.setFontSize(8);
-    doc.setTextColor(...MUTED_TEXT);
     for (const line of legal) {
-      doc.text(line, MARGIN_MM, leftY);
+      writePdfAligned(doc, line, MARGIN_MM, leftY, labels.locale, fonts, {
+        align: "left",
+        fontSize: 8,
+        color: MUTED_TEXT,
+        maxWidth: CONTENT_WIDTH_MM * 0.55,
+      });
       leftY += 4;
     }
   }
@@ -164,14 +160,23 @@ function drawFactureHeader(
   doc.rect(boxLeft, boxTop, boxWidth, boxHeight);
 
   let boxY = boxTop + boxPadding + 3;
-  applyPdfFont(doc, fonts, "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(...MUTED_TEXT);
   const titleText =
-    labels.locale === "ar"
-      ? preparePdfText(inv.title, labels.locale)
-      : inv.title.toUpperCase();
-  doc.text(titleText, rightX - boxPadding, boxY, { align: "right" });
+    labels.locale === "ar" ? inv.title : inv.title.toUpperCase();
+  writePdfAligned(
+    doc,
+    titleText,
+    rightX - boxPadding,
+    boxY,
+    labels.locale,
+    fonts,
+    {
+      align: "right",
+      fontSize: 7,
+      style: "bold",
+      color: MUTED_TEXT,
+      maxWidth: boxWidth - boxPadding * 2,
+    },
+  );
 
   boxY += 5;
   doc.setFont("courier", "bold");
@@ -180,34 +185,52 @@ function drawFactureHeader(
   doc.text(`#${invoice.number}`, rightX - boxPadding, boxY, { align: "right" });
 
   boxY += 5;
-  applyPdfFont(doc, fonts, "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...MUTED_TEXT);
-  doc.text(
+  writePdfAligned(
+    doc,
     `${formatDocumentDateForPdf(invoice.date, labels.locale)} ${labels.atTime} ${invoice.time}`,
     rightX - boxPadding,
     boxY,
-    { align: "right" },
+    labels.locale,
+    fonts,
+    {
+      align: "right",
+      fontSize: 8,
+      color: MUTED_TEXT,
+      maxWidth: boxWidth - boxPadding * 2,
+    },
   );
 
   boxY += 5;
-  applyPdfFont(doc, fonts, "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(0, 0, 0);
-  doc.text(`${formatMad(invoice.totalMad)} ${labels.ttc}`, rightX - boxPadding, boxY, {
-    align: "right",
-  });
+  writePdfAligned(
+    doc,
+    `${formatMad(invoice.totalMad)} ${labels.ttc}`,
+    rightX - boxPadding,
+    boxY,
+    labels.locale,
+    fonts,
+    {
+      align: "right",
+      fontSize: 10,
+      style: "bold",
+      maxWidth: boxWidth - boxPadding * 2,
+    },
+  );
 
   if (remainingMad > 0) {
     boxY += 4;
-    applyPdfFont(doc, fonts, "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...MUTED_TEXT);
-    doc.text(
-      pdfCellText(`${inv.remainingDue} : ${formatMad(remainingMad)}`, labels.locale),
+    writePdfAligned(
+      doc,
+      `${inv.remainingDue} : ${formatMad(remainingMad)}`,
       rightX - boxPadding,
       boxY,
-      { align: "right" },
+      labels.locale,
+      fonts,
+      {
+        align: "right",
+        fontSize: 8,
+        color: MUTED_TEXT,
+        maxWidth: boxWidth - boxPadding * 2,
+      },
     );
   }
 
@@ -837,10 +860,13 @@ export async function buildInternalInvoicePdf(
     y = doc.lastAutoTable.finalY + 6;
 
     if (invoice.paymentHistory.length > 0) {
-      applyPdfFont(doc, fonts, "bold");
-      doc.setFontSize(7);
-      doc.setTextColor(...MUTED_TEXT);
-      doc.text(inv.payments.toUpperCase(), MARGIN_MM, y);
+      writePdfAligned(doc, inv.payments.toUpperCase(), MARGIN_MM, y, locale, fonts, {
+        align: "left",
+        fontSize: 7,
+        style: "bold",
+        color: MUTED_TEXT,
+        maxWidth: CONTENT_WIDTH_MM,
+      });
       y += 3;
 
       autoTable(doc, {

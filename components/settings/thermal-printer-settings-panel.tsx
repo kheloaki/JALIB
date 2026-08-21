@@ -13,7 +13,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toaster";
 import { useThermalPrinter } from "@/hooks/use-thermal-printer";
-import { EscPosBuilder } from "@/lib/print/escpos-builder";
+import { loadTicketLogoForThermal } from "@/lib/print/ticket-logo";
+import { EscPosBuilder, thermalCodePageSummary } from "@/lib/print/escpos-builder";
+import { THERMAL_PRINTER_PROFILE } from "@/lib/print/thermal-printer-profile";
 import { printRawEscPos } from "@/lib/print/thermal-printer";
 import { cn } from "@/lib/utils";
 
@@ -72,27 +74,43 @@ export function ThermalPrinterSettingsPanel({
     if (!printer.connected) return;
     setBusy("test");
     try {
-      const payload = new EscPosBuilder()
-        .init()
-        .align("center")
-        .bold(true)
-        .line("Jamaa Market")
-        .bold(false)
-        .line(tr("Test imprimante thermique", "اختبار الطابعة الحرارية"))
-        .separator("-")
-        .align("left")
-        .line(
-          tr(
-            "Si vous lisez ceci, la connexion ESC/POS fonctionne.",
-            "إذا قرأت هذا، فاتصال ESC/POS يعمل.",
-          ),
-        )
-        .feed(2)
-        .cut()
-        .build();
+      const ticket = new EscPosBuilder().init().align("center");
+      const logo = await loadTicketLogoForThermal(120);
+      if (logo) {
+        ticket.raster(logo);
+        ticket.feed(1);
+      } else {
+        ticket.bold(true).line("Jamaa Market").bold(false);
+      }
+      ticket.line(`WD8260 · ${THERMAL_PRINTER_PROFILE.paperWidthMm}mm`);
+      ticket.line(`Fonts: ${thermalCodePageSummary()} · Font A`);
+      await ticket.lineAuto(
+        tr("Test imprimante thermique", "اختبار الطابعة الحرارية"),
+        { align: "center", bold: true, fontSize: 28 },
+      );
+      ticket.separator("-").align("left");
+      await ticket.lineAuto("Café · Total TTC · 12,50", {
+        align: "left",
+        bold: true,
+      });
+      await ticket.lineAuto("سكر · حليب · زيت", {
+        align: "right",
+        bold: true,
+      });
+      await ticket.lineAuto(
+        tr(
+          "Si vous lisez ceci, la connexion ESC/POS fonctionne.",
+          "إذا قرأت هذا، فاتصال ESC/POS يعمل.",
+        ),
+        { fontSize: 24 },
+      );
+      ticket.separator("=");
+      ticket.columns("Largeur", `${THERMAL_PRINTER_PROFILE.charsPerLine} cols`);
+      ticket.columns("Points", String(THERMAL_PRINTER_PROFILE.dotsPerLine));
+      const payload = ticket.feed(2).cut().build();
       await printRawEscPos(payload);
       toast.success(
-        tr("Ticket de test envoyé", "أُرسلت تذكرة الاختبار"),
+        tr("Ticket de test WD8260 envoyé", "أُرسلت تذكرة اختبار WD8260"),
         tr("Vérifiez l’imprimante thermique.", "تحقق من الطابعة الحرارية."),
       );
     } catch (error) {
@@ -116,7 +134,7 @@ export function ThermalPrinterSettingsPanel({
       >
         <div>
           <h2 className="text-sm font-bold tracking-tight">
-            {tr("Imprimante thermique", "الطابعة الحرارية")}
+            {tr("Imprimante thermique WD8260", "طابعة حرارية WD8260")}
           </h2>
           <p className="text-on-surface-variant mt-0.5 text-xs">
             {tr(
@@ -138,12 +156,12 @@ export function ThermalPrinterSettingsPanel({
     >
       <div>
         <h2 className="text-sm font-bold tracking-tight">
-          {tr("Imprimante thermique", "الطابعة الحرارية")}
+          {tr("Imprimante thermique WD8260", "طابعة حرارية WD8260")}
         </h2>
         <p className="text-on-surface-variant mt-0.5 text-xs">
           {tr(
-            "Connectez l’imprimante une fois ici. À la caisse, le ticket client s’imprime sans boîte de dialogue.",
-            "اربط الطابعة مرة هنا. في الصندوق تُطبع تذكرة الزبون بدون نافذة حوار.",
+            "Profil WDLink WD8260 — ticket 80 mm (576 points / 48 colonnes). Connectez une fois ici ; à la caisse le ticket client s’imprime sans boîte de dialogue.",
+            "ملف WDLink WD8260 — تذكرة 80 مم (576 نقطة / 48 عموداً). اربط مرة هنا؛ في الصندوق تُطبع تذكرة الزبون بدون نافذة حوار.",
           )}
         </p>
       </div>
@@ -255,20 +273,26 @@ export function ThermalPrinterSettingsPanel({
       <ul className="text-on-surface-variant list-disc space-y-1 ps-4 text-[11px] leading-relaxed">
         <li>
           {tr(
+            "Papier : rouleau 80 mm (79,5 ± 0,5 mm) — commande ESC/POS.",
+            "الورق: لفة 80 مم (79.5 ± 0.5 مم) — أوامر ESC/POS.",
+          )}
+        </li>
+        <li>
+          {tr(
             "Chrome ou Edge uniquement (pas Safari / Firefox).",
             "Chrome أو Edge فقط (ليس Safari / Firefox).",
           )}
         </li>
         <li>
           {tr(
-            "La connexion est enregistrée sur ce navigateur / cet appareil.",
-            "يُحفظ الاتصال على هذا المتصفح / هذا الجهاز.",
+            "Préférez USB. Série / COM utilise 115200 baud (adaptateurs USB-COM).",
+            "فضّل USB. التسلسلي / COM يعمل على 115200 باود (محولات USB-COM).",
           )}
         </li>
         <li>
           {tr(
-            "Windows : si « Access denied », installez WinUSB avec Zadig pour l’imprimante.",
-            "ويندوز: إذا ظهر Access denied، ثبّت WinUSB عبر Zadig للطابعة.",
+            "Windows : si « Access denied », installez WinUSB avec Zadig pour le WD8260.",
+            "ويندوز: إذا ظهر Access denied، ثبّت WinUSB عبر Zadig لجهاز WD8260.",
           )}
         </li>
       </ul>

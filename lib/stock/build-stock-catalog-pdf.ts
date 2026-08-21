@@ -8,7 +8,11 @@ import {
   getDocumentLabels,
 } from "@/lib/i18n/document-labels";
 import { formatMad } from "@/lib/money/mad";
-import { applyPdfFont, setupDocumentPdfFont } from "@/lib/pdf/document-pdf-font";
+import { setupDocumentPdfFont } from "@/lib/pdf/document-pdf-font";
+import {
+  createAutoTableLocaleHooks,
+  writePdfAligned,
+} from "@/lib/pdf/pdf-text";
 
 const MARGIN_MM = 12;
 const PAGE_WIDTH_MM = 210;
@@ -54,27 +58,34 @@ export async function buildStockCatalogPdf(
   const fonts = await setupDocumentPdfFont(doc, locale);
   let y = MARGIN_MM;
 
-  applyPdfFont(doc, fonts, "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(15, 23, 42);
-  doc.text(STORE_NAME, MARGIN_MM, y);
+  writePdfAligned(doc, STORE_NAME, MARGIN_MM, y, locale, fonts, {
+    align: "left",
+    fontSize: 14,
+    style: "bold",
+    color: [15, 23, 42],
+  });
 
-  applyPdfFont(doc, fonts, "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(...MUTED_TEXT);
   const generatedAt = formatDocumentDateTimeForPdf(locale);
-  doc.text(generatedAt, PAGE_WIDTH_MM - MARGIN_MM, y, { align: "right" });
+  writePdfAligned(
+    doc,
+    generatedAt,
+    PAGE_WIDTH_MM - MARGIN_MM,
+    y,
+    locale,
+    fonts,
+    { align: "right", fontSize: 9, color: MUTED_TEXT },
+  );
   y += 8;
 
-  applyPdfFont(doc, fonts, "bold");
-  doc.setFontSize(16);
-  doc.setTextColor(15, 23, 42);
-  doc.text(document.title, MARGIN_MM, y);
+  writePdfAligned(doc, document.title, MARGIN_MM, y, locale, fonts, {
+    align: "left",
+    fontSize: 16,
+    style: "bold",
+    color: [15, 23, 42],
+    maxWidth: CONTENT_WIDTH_MM,
+  });
   y += 7;
 
-  applyPdfFont(doc, fonts, "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(...MUTED_TEXT);
   const meta = [
     stock.filter(document.filterLabel),
     document.searchQuery
@@ -89,7 +100,12 @@ export async function buildStockCatalogPdf(
   ]
     .filter((line): line is string => line !== null)
     .join("  •  ");
-  doc.text(meta, MARGIN_MM, y, { maxWidth: CONTENT_WIDTH_MM });
+  writePdfAligned(doc, meta, MARGIN_MM, y, locale, fonts, {
+    align: "left",
+    fontSize: 9,
+    color: MUTED_TEXT,
+    maxWidth: CONTENT_WIDTH_MM,
+  });
   y += 10;
 
   autoTable(doc, {
@@ -139,6 +155,7 @@ export async function buildStockCatalogPdf(
       5: { halign: "right", cellWidth: 24 },
       6: { halign: "right", cellWidth: 16 },
     },
+    ...createAutoTableLocaleHooks(locale, fonts),
   });
 
   return doc;

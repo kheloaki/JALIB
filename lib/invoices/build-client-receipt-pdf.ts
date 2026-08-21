@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 
 import type { toReceiptSettings } from "@/lib/i18n/app-document-settings";
-import { STORE_LOGO_PRINT_PATH, STORE_NAME } from "@/lib/brand/constants";
+import { STORE_NAME } from "@/lib/brand/constants";
 import { drawReceiptEan13BarcodePdf } from "@/lib/invoices/barcode-pdf";
 import {
   invoicePaidMad,
@@ -11,7 +11,6 @@ import {
 import type { Invoice, InvoicePaymentType } from "@/lib/invoices/types";
 import {
   formatReceiptDateTimeForPdf,
-  formatReceiptLineQty,
   formatReceiptMoney,
 } from "@/lib/invoices/receipt-display";
 import { getDocumentLabels } from "@/lib/i18n/document-labels";
@@ -20,20 +19,21 @@ import {
   type DocumentPdfFonts,
 } from "@/lib/pdf/document-pdf-font";
 import {
-  hasArabicLetters,
-  writePdfArabicText,
   writePdfCentered,
   writePdfLatinText,
   writePdfReceiptText,
-  writePdfTotalLine,
 } from "@/lib/pdf/pdf-text";
+import {
+  loadTicketLogoForPdf,
+  type TicketLogoPdf,
+} from "@/lib/print/ticket-logo";
 
 type ClientReceiptPdfSettings = ReturnType<typeof toReceiptSettings>;
 
+/** Match WD8260 / on-screen thermal ticket (same as HTML print). */
 const PAGE_WIDTH_MM = 80;
-const MARGIN_MM = 5;
+const MARGIN_MM = 2;
 const CONTENT_WIDTH_MM = PAGE_WIDTH_MM - MARGIN_MM * 2;
-const MUTED_TEXT: [number, number, number] = [71, 85, 105];
 
 function sanitizeFilename(value: string): string {
   return value.replace(/[^\w.-]+/g, "_");
@@ -48,108 +48,82 @@ function paymentTypeLabel(
 }
 
 function drawDashedLine(doc: jsPDF, y: number) {
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineDashPattern([1, 1], 0);
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineDashPattern([1.2, 1.2], 0);
+  doc.setLineWidth(0.2);
   doc.line(MARGIN_MM, y, PAGE_WIDTH_MM - MARGIN_MM, y);
   doc.setLineDashPattern([], 0);
+  doc.setLineWidth(0.2);
 }
 
 function estimateReceiptHeight(invoice: Invoice): number {
   const lineRows = invoice.lines.reduce((sum, line) => {
-    const returnedExtra = (line.returnedQty ?? 0) > 0 ? 3 : 0;
-    return sum + 5 + returnedExtra;
+    const returnedExtra = (line.returnedQty ?? 0) > 0 ? 3.5 : 0;
+    return sum + 9 + returnedExtra;
   }, 0);
-  const paymentBlock =
+  const showBalance =
+    invoice.paymentType === "credit" ||
+    invoice.paymentHistory.length > 0 ||
+    invoiceRemainingMad(invoice) > 0;
+  const balanceBlock = showBalance ? 12 : 0;
+  const historyBlock =
     invoice.paymentHistory.length > 0
-      ? 28 + invoice.paymentHistory.length * 14
+      ? 8 + invoice.paymentHistory.length * 6
       : 0;
 
-  return (
-    38 +
-    18 +
-    8 +
-    lineRows +
-    18 +
-    paymentBlock +
-    10 +
-    22 +
-    MARGIN_MM * 2
+  return Math.max(
+    140,
+    42 + 16 + 18 + lineRows + 12 + balanceBlock + historyBlock + 10 + 24,
   );
 }
 
-async function loadLogoForPdf(): Promise<{
-  dataUrl: string;
-  widthMm: number;
-  heightMm: number;
-} | null> {
-  try {
-    const response = await fetch(STORE_LOGO_PRINT_PATH);
-    if (!response.ok) return null;
-    const blob = await response.blob();
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error("Logo read failed"));
-      reader.readAsDataURL(blob);
-    });
-    const image = new Image();
-    image.src = dataUrl;
-    await new Promise<void>((resolve, reject) => {
-      image.onload = () => resolve();
-      image.onerror = () => reject(new Error("Logo decode failed"));
-    });
-    const maxHeightMm = 14;
-    const ratio = image.naturalWidth / image.naturalHeight;
-    const heightMm = maxHeightMm;
-    return { dataUrl, widthMm: heightMm * ratio, heightMm };
-  } catch {
-    return null;
-  }
+async function loadLogoForPdf(): Promise<TicketLogoPdf | null> {
+  return loadTicketLogoForPdf(16);
 }
 
-function writeReceiptMetaRow(
+/** Same LTR row layout as HTML thermal ticket: label left, value right. */
+function writeTicketRow(
   doc: jsPDF,
   label: string,
   value: string,
   y: number,
   locale: ClientReceiptPdfSettings["documentLocale"],
   fonts: DocumentPdfFonts,
+  options: { fontSize?: number; valueBold?: boolean } = {},
 ) {
-  doc.setFontSize(7);
-
-  if (locale === "ar") {
-    writePdfArabicText(doc, label, PAGE_WIDTH_MM - MARGIN_MM, y, fonts, {
-      align: "right",
-      color: MUTED_TEXT,
-      maxWidth: CONTENT_WIDTH_MM * 0.48,
-    });
-    writePdfReceiptText(doc, value, MARGIN_MM, y, locale, fonts, {
-      align: "left",
-      style: "bold",
-      forceLatin: !hasArabicLetters(value),
-      maxWidth: CONTENT_WIDTH_MM * 0.52,
-    });
-    return;
-  }
-
-  writePdfLatinText(doc, label, MARGIN_MM, y, {
-    color: MUTED_TEXT,
-    maxWidth: CONTENT_WIDTH_MM * 0.48,
-  });
-  writePdfReceiptText(doc, value, PAGE_WIDTH_MM - MARGIN_MM, y, locale, fonts, {
-    align: "right",
+  const fontSize = options.fontSize ?? 8;
+  doc.setTextColor(0, 0, 0);
+  writePdfReceiptText(doc, label, MARGIN_MM, y, locale, fonts, {
+    align: "left",
+    fontSize,
     style: "bold",
-    maxWidth: CONTENT_WIDTH_MM * 0.52,
+    maxWidth: CONTENT_WIDTH_MM * 0.45,
   });
+  writePdfReceiptText(
+    doc,
+    value,
+    PAGE_WIDTH_MM - MARGIN_MM,
+    y,
+    locale,
+    fonts,
+    {
+      align: "right",
+      fontSize,
+      style: options.valueBold === false ? "normal" : "bold",
+      maxWidth: CONTENT_WIDTH_MM * 0.52,
+    },
+  );
 }
 
 type BuildClientReceiptOptions = {
-  /** Append as a new page on an existing document (combined download). */
   existingDoc?: jsPDF;
   fonts?: DocumentPdfFonts;
   logo?: Awaited<ReturnType<typeof loadLogoForPdf>>;
 };
 
+/**
+ * Client ticket PDF — layout matches on-screen / browser-printed thermal ticket.
+ */
 export async function buildClientReceiptPdf(
   invoice: Invoice,
   settings: ClientReceiptPdfSettings,
@@ -158,9 +132,17 @@ export async function buildClientReceiptPdf(
   const labels = getDocumentLabels(settings.documentLocale);
   const inv = labels.invoice;
   const locale = labels.locale;
-  const paidMad = invoicePaidMad(invoice);
-  const remainingMad = invoiceRemainingMad(invoice);
-  const pageHeight = Math.max(140, estimateReceiptHeight(invoice));
+  const paidMad =
+    invoice.paymentType === "cash"
+      ? invoice.totalMad
+      : invoicePaidMad(invoice);
+  const remainingMad =
+    invoice.paymentType === "cash" ? 0 : invoiceRemainingMad(invoice);
+  const showBalance =
+    invoice.paymentType === "credit" ||
+    invoice.paymentHistory.length > 0 ||
+    remainingMad > 0;
+  const pageHeight = estimateReceiptHeight(invoice);
 
   let doc = options?.existingDoc;
   let fonts = options?.fonts;
@@ -182,7 +164,7 @@ export async function buildClientReceiptPdf(
   if (logo) {
     doc.addImage(
       logo.dataUrl,
-      "PNG",
+      logo.format,
       (PAGE_WIDTH_MM - logo.widthMm) / 2,
       y,
       logo.widthMm,
@@ -197,7 +179,7 @@ export async function buildClientReceiptPdf(
       locale,
       fonts,
       {
-        fontSize: 9,
+        fontSize: 10,
         style: "bold",
         pageCenterX: PAGE_WIDTH_MM / 2,
         maxWidth: CONTENT_WIDTH_MM,
@@ -206,49 +188,45 @@ export async function buildClientReceiptPdf(
     y += 5;
   }
 
-  doc.setTextColor(0, 74, 198);
+  doc.setTextColor(0, 0, 0);
   writePdfCentered(doc, inv.clientCopyTitle, y, locale, fonts, {
-    fontSize: 8,
+    fontSize: 9,
     style: "bold",
     pageCenterX: PAGE_WIDTH_MM / 2,
     maxWidth: CONTENT_WIDTH_MM,
   });
   y += 4;
 
-  if (settings.storeAddress || settings.storePhone) {
-    doc.setTextColor(...MUTED_TEXT);
-    if (settings.storeAddress) {
-      writePdfCentered(doc, settings.storeAddress, y, locale, fonts, {
-        fontSize: 6,
-        pageCenterX: PAGE_WIDTH_MM / 2,
+  if (settings.storeAddress) {
+    writePdfCentered(doc, settings.storeAddress, y, locale, fonts, {
+      fontSize: 7,
+      style: "bold",
+      pageCenterX: PAGE_WIDTH_MM / 2,
+      maxWidth: CONTENT_WIDTH_MM,
+    });
+    y += 3.5;
+  }
+  if (settings.storePhone) {
+    writePdfLatinText(
+      doc,
+      `${labels.phonePrefix} ${settings.storePhone}`,
+      PAGE_WIDTH_MM / 2,
+      y,
+      {
+        align: "center",
+        fontSize: 7,
+        style: "bold",
         maxWidth: CONTENT_WIDTH_MM,
-      });
-      y += 3.5;
-    }
-    if (settings.storePhone) {
-      writePdfReceiptText(
-        doc,
-        `${labels.phonePrefix} ${settings.storePhone}`,
-        PAGE_WIDTH_MM / 2,
-        y,
-        locale,
-        fonts,
-        {
-          align: "center",
-          fontSize: 6,
-          forceLatin: !hasArabicLetters(settings.storePhone),
-          maxWidth: CONTENT_WIDTH_MM,
-        },
-      );
-      y += 3.5;
-    }
+      },
+    );
+    y += 3.5;
   }
 
-  y += 2;
+  y += 1;
   drawDashedLine(doc, y);
   y += 4;
 
-  writeReceiptMetaRow(
+  writeTicketRow(
     doc,
     inv.invoiceNumber,
     `#${invoice.number}`,
@@ -257,7 +235,7 @@ export async function buildClientReceiptPdf(
     fonts,
   );
   y += 4;
-  writeReceiptMetaRow(
+  writeTicketRow(
     doc,
     inv.dateTime,
     formatReceiptDateTimeForPdf(invoice.date, invoice.time),
@@ -266,9 +244,9 @@ export async function buildClientReceiptPdf(
     fonts,
   );
   y += 4;
-  writeReceiptMetaRow(doc, inv.customer, invoice.clientName, y, locale, fonts);
+  writeTicketRow(doc, inv.customer, invoice.clientName, y, locale, fonts);
   y += 4;
-  writeReceiptMetaRow(
+  writeTicketRow(
     doc,
     inv.payment,
     paymentTypeLabel(invoice.paymentType, locale),
@@ -280,36 +258,11 @@ export async function buildClientReceiptPdf(
   drawDashedLine(doc, y);
   y += 4;
 
-  if (locale === "ar") {
-    writePdfArabicText(doc, inv.details, PAGE_WIDTH_MM - MARGIN_MM, y, fonts, {
-      align: "right",
-      fontSize: 6,
-      style: "bold",
-      color: MUTED_TEXT,
-      maxWidth: CONTENT_WIDTH_MM,
-    });
-  } else {
-    writePdfLatinText(doc, inv.details, MARGIN_MM, y, {
-      fontSize: 6,
-      style: "bold",
-      color: MUTED_TEXT,
-      maxWidth: CONTENT_WIDTH_MM,
-    });
-  }
-  y += 4;
-
   for (const line of invoice.lines) {
     const qty = invoiceRemainingQty(line);
-    const priceQty = formatReceiptLineQty(line.unitPriceMad, qty, locale);
+    const lineTotal = Math.round(line.unitPriceMad * qty * 100) / 100;
 
-    doc.setFontSize(7);
-    doc.setTextColor(...MUTED_TEXT);
-    writePdfLatinText(doc, priceQty, MARGIN_MM, y, { align: "left" });
-
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(7);
-    const priceWidth = doc.getTextWidth(priceQty) + 2;
-    const nameMaxWidth = CONTENT_WIDTH_MM - priceWidth;
+    // Same order as HTML ClientReceipt: name → returned → qty × price | total
     writePdfReceiptText(
       doc,
       line.nameAr,
@@ -319,16 +272,14 @@ export async function buildClientReceiptPdf(
       fonts,
       {
         align: "right",
-        style: "normal",
-        maxWidth: nameMaxWidth,
+        style: "bold",
+        fontSize: 9,
+        maxWidth: CONTENT_WIDTH_MM,
       },
     );
-
-    y += 4.5;
+    y += 4;
 
     if ((line.returnedQty ?? 0) > 0) {
-      doc.setFontSize(6);
-      doc.setTextColor(...MUTED_TEXT);
       writePdfReceiptText(
         doc,
         inv.returnedQty(line.returnedQty ?? 0),
@@ -336,52 +287,61 @@ export async function buildClientReceiptPdf(
         y,
         locale,
         fonts,
-        { align: "right", maxWidth: nameMaxWidth },
+        { align: "right", fontSize: 7, maxWidth: CONTENT_WIDTH_MM },
       );
-      y += 3;
+      y += 3.5;
     }
+
+    writePdfLatinText(
+      doc,
+      `${qty} x ${formatReceiptMoney(line.unitPriceMad, "fr")}`,
+      MARGIN_MM,
+      y,
+      { align: "left", fontSize: 8, style: "bold" },
+    );
+    writePdfLatinText(
+      doc,
+      formatReceiptMoney(lineTotal, "fr"),
+      PAGE_WIDTH_MM - MARGIN_MM,
+      y,
+      { align: "right", fontSize: 8, style: "bold" },
+    );
+    y += 4.5;
   }
 
-  y += 2;
   drawDashedLine(doc, y);
   y += 5;
 
-  doc.setTextColor(...MUTED_TEXT);
-  writePdfCentered(doc, inv.totalTtc, y, locale, fonts, {
-    fontSize: 6,
+  // One total row like the printed ticket (label left, large amount right).
+  writePdfReceiptText(doc, inv.totalTtc, MARGIN_MM, y, locale, fonts, {
+    align: "left",
+    fontSize: 9,
     style: "bold",
-    pageCenterX: PAGE_WIDTH_MM / 2,
-    maxWidth: CONTENT_WIDTH_MM,
+    maxWidth: CONTENT_WIDTH_MM * 0.4,
   });
-  y += 5;
-
-  writePdfTotalLine(
+  writePdfLatinText(
     doc,
-    formatReceiptMoney(invoice.totalMad, locale),
-    labels.currencyWord,
+    formatReceiptMoney(invoice.totalMad, "fr"),
+    PAGE_WIDTH_MM - MARGIN_MM,
     y,
-    locale,
-    fonts,
-    { fontSize: 12, pageCenterX: PAGE_WIDTH_MM / 2 },
+    { align: "right", fontSize: 14, style: "bold" },
   );
-  y += 10;
+  y += 7;
 
-  if (invoice.paymentHistory.length > 0) {
-    drawDashedLine(doc, y);
-    y += 4;
-    writeReceiptMetaRow(
+  if (showBalance) {
+    writeTicketRow(
       doc,
       inv.paidLabel,
-      formatReceiptMoney(paidMad, locale),
+      formatReceiptMoney(paidMad, "fr"),
       y,
       locale,
       fonts,
     );
     y += 4;
-    writeReceiptMetaRow(
+    writeTicketRow(
       doc,
       inv.remainingLabel,
-      formatReceiptMoney(remainingMad, locale),
+      formatReceiptMoney(remainingMad, "fr"),
       y,
       locale,
       fonts,
@@ -389,14 +349,63 @@ export async function buildClientReceiptPdf(
     y += 5;
   }
 
-  if (settings.receiptFooter) {
-    doc.setTextColor(...MUTED_TEXT);
-    writePdfLatinText(doc, settings.receiptFooter, PAGE_WIDTH_MM / 2, y, {
-      align: "center",
-      fontSize: 6,
+  if (invoice.paymentHistory.length > 0) {
+    drawDashedLine(doc, y);
+    y += 4;
+    writePdfReceiptText(doc, inv.paymentHistory, MARGIN_MM, y, locale, fonts, {
+      align: "left",
+      fontSize: 7,
+      style: "bold",
       maxWidth: CONTENT_WIDTH_MM,
     });
-    y += 6;
+    y += 4;
+    for (const payment of invoice.paymentHistory) {
+      const amount = `${payment.amountMad >= 0 ? "+" : ""}${formatReceiptMoney(payment.amountMad, "fr")}`;
+      writePdfLatinText(doc, amount, MARGIN_MM, y, {
+        align: "left",
+        fontSize: 7,
+        style: "bold",
+      });
+      writePdfLatinText(
+        doc,
+        formatReceiptDateTimeForPdf(payment.date, "").trim(),
+        PAGE_WIDTH_MM - MARGIN_MM,
+        y,
+        { align: "right", fontSize: 7 },
+      );
+      y += 3.5;
+      if (payment.note) {
+        writePdfReceiptText(
+          doc,
+          payment.note,
+          MARGIN_MM,
+          y,
+          locale,
+          fonts,
+          { align: "left", fontSize: 6, maxWidth: CONTENT_WIDTH_MM },
+        );
+        y += 3;
+      }
+    }
+    y += 2;
+  }
+
+  if (settings.receiptFooter) {
+    writePdfReceiptText(
+      doc,
+      settings.receiptFooter,
+      PAGE_WIDTH_MM / 2,
+      y,
+      locale,
+      fonts,
+      {
+        align: "center",
+        fontSize: 7,
+        style: "bold",
+        maxWidth: CONTENT_WIDTH_MM,
+      },
+    );
+    y += 5;
   }
 
   y += 2;
@@ -411,7 +420,6 @@ export async function buildClientReceiptPdf(
   return doc;
 }
 
-/** One PDF with each invoice on its own page (thermal ticket size). */
 export async function buildCombinedClientReceiptPdf(
   invoices: readonly Invoice[],
   settings: ClientReceiptPdfSettings,
@@ -421,9 +429,11 @@ export async function buildCombinedClientReceiptPdf(
   }
   const logo = await loadLogoForPdf();
   let doc = await buildClientReceiptPdf(invoices[0]!, settings, { logo });
-  for (let i = 1; i < invoices.length; i++) {
+  const fonts = await setupDocumentPdfFont(doc, settings.documentLocale);
+  for (let i = 1; i < invoices.length; i += 1) {
     doc = await buildClientReceiptPdf(invoices[i]!, settings, {
       existingDoc: doc,
+      fonts,
       logo,
     });
   }

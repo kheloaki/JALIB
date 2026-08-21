@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  arabicShapedToLtrDrawText,
+  getPdfMixedPaintRuns,
   hasArabicLetters,
   hasArabicPresentationForms,
   needsArabicPdfFont,
+  pdfParagraphDirection,
   shapeArabicForPdf,
   splitPdfScriptRuns,
 } from "@/lib/pdf/pdf-text";
@@ -42,6 +45,27 @@ describe("pdf arabic font detection", () => {
     expect(runs.map((r) => r.text).join("")).toBe("منتج (خاص)");
     expect(runs.some((r) => r.arabic && r.text.includes("منتج"))).toBe(true);
     expect(runs.some((r) => !r.arabic && r.text.includes("("))).toBe(true);
+  });
+
+  it("keeps Arabic product names in catalog order for LTR PDF paint", () => {
+    expect(pdfParagraphDirection("سيرجيو شكلاط")).toBe("rtl");
+    expect(pdfParagraphDirection("1 U سكر")).toBe("ltr");
+
+    const nameRuns = getPdfMixedPaintRuns("سيرجيو شكلاط").map((r) => r.text);
+    expect(nameRuns[0]).toBe("شكلاط");
+    expect(nameRuns.at(-1)).toBe("سيرجيو");
+
+    const mixed = getPdfMixedPaintRuns("1 U سكر").map((r) => r.text);
+    expect(mixed[0]).toContain("1 U");
+    expect(mixed.at(-1)).toContain("سكر");
+
+    const shaped = shapeArabicForPdf("سكر");
+    const draw = arabicShapedToLtrDrawText(shaped);
+    expect(draw.startsWith("\u202A")).toBe(true);
+    expect(draw.endsWith("\u202C")).toBe(true);
+    const inner = draw.slice(1, -1);
+    expect(inner).toBe([...shaped].reverse().join(""));
+    expect(inner).not.toBe(shaped);
   });
 
   it("treats pure latin as latin", () => {

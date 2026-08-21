@@ -52,7 +52,7 @@ export function useThermalPrinter() {
       if (!isThermalPrinterActive()) {
         throw new Error("Imprimante thermique inactive.");
       }
-      const payload = buildClientReceiptEscPos(invoice, settings);
+      const payload = await buildClientReceiptEscPos(invoice, settings);
       await printRawEscPos(payload);
     },
     [],

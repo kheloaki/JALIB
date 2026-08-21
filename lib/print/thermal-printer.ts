@@ -1,9 +1,13 @@
+import { THERMAL_PRINTER_PROFILE } from "@/lib/print/thermal-printer-profile";
+
 /**
  * Direct thermal printing via WebUSB or Web Serial (ESC/POS).
- * When connected, POS can print without the browser print dialog.
+ * Default profile: WDLink WD8260 (80mm / 576 dots).
  */
 
 const STORAGE_KEY = "matjar:thermal-printer:v1";
+const USB_CHUNK = THERMAL_PRINTER_PROFILE.usbChunkBytes;
+const SERIAL_BAUD = THERMAL_PRINTER_PROFILE.serialBaudRate;
 
 export type ThermalTransport = "usb" | "serial";
 
@@ -233,7 +237,7 @@ async function writeUsb(data: Uint8Array): Promise<void> {
   if (!usbDevice || usbEndpointNumber == null) {
     throw new Error("Imprimante USB non connectée.");
   }
-  const CHUNK = 64;
+  const CHUNK = USB_CHUNK;
   for (let offset = 0; offset < data.length; offset += CHUNK) {
     const slice = Uint8Array.from(data.subarray(offset, offset + CHUNK));
     await usbDevice.transferOut(usbEndpointNumber, slice);
@@ -278,7 +282,7 @@ async function connectUsbDevice(device: UsbDeviceLike): Promise<void> {
   activeTransport = "usb";
   deviceLabel =
     [device.productName, device.manufacturerName].filter(Boolean).join(" · ") ||
-    `USB ${device.vendorId.toString(16)}:${device.productId.toString(16)}`;
+    `WD8260 USB ${device.vendorId.toString(16)}:${device.productId.toString(16)}`;
   lastError = null;
   writePreference({ transport: "usb" });
   notify();
@@ -286,7 +290,7 @@ async function connectUsbDevice(device: UsbDeviceLike): Promise<void> {
 
 async function connectSerialPort(port: SerialPortLike): Promise<void> {
   await disconnectThermalPrinter();
-  await port.open({ baudRate: 9600 });
+  await port.open({ baudRate: SERIAL_BAUD });
   const writer = port.writable?.getWriter();
   if (!writer) {
     await port.close().catch(() => undefined);
@@ -295,7 +299,7 @@ async function connectSerialPort(port: SerialPortLike): Promise<void> {
   serialPort = port;
   serialWriter = writer;
   activeTransport = "serial";
-  deviceLabel = "Imprimante série / USB-COM";
+  deviceLabel = `WD8260 · série / USB-COM (${SERIAL_BAUD} baud)`;
   lastError = null;
   writePreference({ transport: "serial" });
   notify();
