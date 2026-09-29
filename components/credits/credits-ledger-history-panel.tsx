@@ -3,11 +3,13 @@
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useLocale } from "next-intl";
+import { useMutation, useQuery } from "convex/react";
 import {
   Banknote,
   FileText,
   RotateCcw,
   Search,
+  Trash2,
 } from "lucide-react";
 
 import {
@@ -45,10 +47,15 @@ import type { Client } from "@/lib/clients/types";
 import type { LedgerEntry } from "@/lib/credits/types";
 import { InvoiceClientFilter } from "@/components/invoices/invoice-client-filter";
 import { Button } from "@/components/ui/button";
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import { Input } from "@/components/ui/input";
 import { FrenchDateInput } from "@/components/ui/french-date-input";
 import { SortableTh } from "@/components/ui/sortable-th";
+import { useToast } from "@/components/ui/toaster";
 import { useClientTableSort } from "@/hooks/use-client-table-sort";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import { canDeleteCreditPayments } from "@/lib/auth/permissions";
 import { formatMad } from "@/lib/money/mad";
 import { cn } from "@/lib/utils";
 
@@ -114,6 +121,16 @@ export function CreditsLedgerHistoryPanel({
 }) {
   const locale = useLocale();
   const isAr = locale === "ar";
+  const toast = useToast();
+  const currentUser = useQuery(api.authz.currentUser);
+  const canDeletePayment = canDeleteCreditPayments(
+    currentUser?.permissions ?? [],
+  );
+  const removePayment = useMutation(api.credits.removePayment);
+  const [paymentToDelete, setPaymentToDelete] = useState<LedgerRow | null>(
+    null,
+  );
+  const [deletingPayment, setDeletingPayment] = useState(false);
   const [historyKindFilter, setHistoryKindFilter] =
     useState<HistoryKindFilter>(fixedKind ?? "all");
   const [historyStatusFilter, setHistoryStatusFilter] =
@@ -279,7 +296,36 @@ export function CreditsLedgerHistoryPanel({
     (scopeAll ? 1 : 0) +
     6 +
     (showVerification ? 1 : 0) +
-    (runningSoldeEnabled ? 1 : 0);
+    (runningSoldeEnabled ? 1 : 0) +
+    (canDeletePayment ? 1 : 0);
+
+  async function handleConfirmDeletePayment() {
+    if (!paymentToDelete) return;
+    setDeletingPayment(true);
+    try {
+      await removePayment({
+        ledgerEntryId: paymentToDelete.id as Id<"creditLedgerEntries">,
+        confirmRef: paymentToDelete.ref,
+      });
+      toast.success(
+        tr("Paiement supprimé", "تم حذف الدفعة"),
+        tr(
+          "Le solde, les factures et le plan ont été remis comme avant ce paiement.",
+          "تمت إعادة الرصيد والفواتير والخطة كما كانت قبل هذه الدفعة.",
+        ),
+      );
+      setPaymentToDelete(null);
+    } catch (error) {
+      toast.error(
+        tr("Suppression impossible", "تعذر الحذف"),
+        error instanceof Error
+          ? error.message
+          : tr("Réessayez dans un instant.", "حاول مرة أخرى."),
+      );
+    } finally {
+      setDeletingPayment(false);
+    }
+  }
 
   return (
     <div className="bg-surface-container-lowest border-sidebar-border overflow-hidden rounded-xl border shadow-sm">
@@ -569,6 +615,11 @@ export function CreditsLedgerHistoryPanel({
               >
                 {tr("Statut", "الحالة")}
               </SortableTh>
+              {canDeletePayment ? (
+                <th className="text-on-surface-variant px-4 py-4 text-right text-[10px] font-bold tracking-wider uppercase">
+                  {tr("Actions", "إجراءات")}
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-sidebar-border divide-y">
@@ -786,6 +837,26 @@ export function CreditsLedgerHistoryPanel({
                         </span>
                       </div>
                     </td>
+                    {canDeletePayment ? (
+                      <td className="px-3 py-4 text-right">
+                        {isPaymentRow ? (
+                          <button
+                            type="button"
+                            className="text-on-surface-variant hover:bg-error-container hover:text-on-error-container inline-flex size-8 items-center justify-center rounded-lg"
+                            aria-label={tr(
+                              `Supprimer le paiement ${row.ref}`,
+                              `حذف الدفعة ${row.ref}`,
+                            )}
+                            onClick={() => setPaymentToDelete(row)}
+                          >
+                            <Trash2
+                              className="size-4 stroke-[1.75]"
+                              aria-hidden
+                            />
+                          </button>
+                        ) : null}
+                      </td>
+                    ) : null}
                   </tr>
                 );
               })
@@ -793,6 +864,36 @@ export function CreditsLedgerHistoryPanel({
           </tbody>
         </table>
       </div>
+
+      <ConfirmDeleteDialog
+        open={paymentToDelete != null}
+        onOpenChange={(open) => {
+          if (!open && !deletingPayment) setPaymentToDelete(null);
+        }}
+        entityName={
+          paymentToDelete
+            ? `${paymentToDelete.ref} · ${formatMad(paymentToDelete.amountMad, 2, locale)}`
+            : ""
+        }
+        confirmText={paymentToDelete?.ref ?? ""}
+        title={tr("Supprimer ce paiement ?", "حذف هذه الدفعة؟")}
+        description={tr(
+          "Le paiement sera annulé comme s'il n'avait jamais existé : le solde du client, les factures et le plan lié seront remis à l'état précédent. Tapez la référence exacte pour confirmer.",
+          "سيتم إلغاء الدفعة وكأنها لم توجد: سيُعاد رصيد العميل والفواتير والخطة المرتبطة إلى حالتها السابقة. اكتب المرجع تمامًا للتأكيد.",
+        )}
+        typePrompt={
+          paymentToDelete
+            ? tr(
+                `Tapez « ${paymentToDelete.ref} » pour confirmer`,
+                `اكتب « ${paymentToDelete.ref} » للتأكيد`,
+              )
+            : undefined
+        }
+        confirmLabel={tr("Supprimer définitivement", "حذف نهائي")}
+        cancelLabel={tr("Annuler", "إلغاء")}
+        busy={deletingPayment}
+        onConfirm={handleConfirmDeletePayment}
+      />
     </div>
   );
 }

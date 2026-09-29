@@ -18,6 +18,7 @@ import {
   computeClientInvoiceSettlementStatusesForClient,
   computeInvoiceGrossTotalCents,
   computeInvoiceReturnedArticlesQty,
+  invoicePaymentsTotalCents,
   syncClientInvoiceLedgerStatuses,
   syncInvoiceLedgerEntry,
 } from "./invoiceCreditAdjustments";
@@ -228,7 +229,12 @@ async function updateLinkedPlanAfterPayment(
 ) {
   const entries = await planEntries(ctx, plan._id);
   const remainingMadCents = planRemainingMadCents(plan, entries);
-  const status = remainingMadCents <= 0 ? "completed" : "active";
+  const status =
+    plan.status === "cancelled" || plan.status === "draft"
+      ? plan.status
+      : remainingMadCents <= 0
+        ? "completed"
+        : "active";
   const now = Date.now();
   await ctx.db.patch(plan._id, {
     status,
@@ -238,9 +244,14 @@ async function updateLinkedPlanAfterPayment(
         : nextDueDateAfterPlanPayment(plan, entries),
     updatedAt: now,
   });
-  if (status === "completed" && plan.invoiceId) {
+  if (!plan.invoiceId) return;
+  const invoice = await ctx.db.get(plan.invoiceId);
+  if (!invoice || invoice.paymentType !== "credit") return;
+  if (invoice.status === "returned") return;
+  const nextInvoiceStatus = status === "completed" ? "paid" : "pending";
+  if (invoice.status !== nextInvoiceStatus) {
     await ctx.db.patch(plan.invoiceId, {
-      status: "paid",
+      status: nextInvoiceStatus,
       updatedAt: now,
     });
   }
@@ -569,5 +580,113 @@ export const requestLedgerUpdate = mutation({
       status: "pending",
       createdAt: Date.now(),
     });
+  },
+});
+
+/**
+ * Permanently remove a received credit payment and restore client solde,
+ * invoice settlement, and linked installment plan as if it never existed.
+ * Matches Jamaa Market (`credits.removePayment`).
+ */
+export const removePayment = mutation({
+  args: {
+    ledgerEntryId: v.id("creditLedgerEntries"),
+    confirmRef: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { userId, user } = await requireAnyPermission(ctx, [
+      "credits.collect",
+      "credits.approve",
+    ]);
+
+    const entry = await ctx.db.get(args.ledgerEntryId);
+    if (!entry) throw new Error("Paiement introuvable.");
+    if (entry.kind !== "payment" || entry.source === "return") {
+      throw new Error("Seuls les paiements reçus peuvent être supprimés.");
+    }
+    if (args.confirmRef.trim() !== entry.ref.trim()) {
+      throw new Error("La référence de confirmation ne correspond pas.");
+    }
+
+    const clientId = entry.clientId;
+    const planId = entry.planId ?? null;
+    const invoiceId = entry.invoiceId ?? null;
+    const amountMad = centsToMad(entry.amountMadCents);
+    const ref = entry.ref;
+
+    const updateRequests = await ctx.db
+      .query("creditLedgerUpdateRequests")
+      .withIndex("by_ledgerEntryId", (q) =>
+        q.eq("ledgerEntryId", args.ledgerEntryId),
+      )
+      .take(50);
+    for (const request of updateRequests) {
+      await ctx.db.delete(request._id);
+    }
+
+    const linkedInvoicePayments = await ctx.db
+      .query("invoicePayments")
+      .withIndex("by_ledgerEntryId", (q) =>
+        q.eq("ledgerEntryId", args.ledgerEntryId),
+      )
+      .take(100);
+    const touchedInvoiceIds = new Set<Id<"invoices">>(
+      linkedInvoicePayments.map((payment) => payment.invoiceId),
+    );
+    if (invoiceId) touchedInvoiceIds.add(invoiceId);
+    for (const payment of linkedInvoicePayments) {
+      await ctx.db.delete(payment._id);
+    }
+
+    await ctx.db.delete(args.ledgerEntryId);
+
+    if (planId) {
+      const plan = await ctx.db.get(planId);
+      if (plan) {
+        await updateLinkedPlanAfterPayment(ctx, plan, entry.date);
+        if (plan.invoiceId) {
+          await syncInvoiceLedgerEntry(ctx, plan.invoiceId);
+        }
+      }
+    }
+
+    await syncClientInvoiceLedgerStatuses(ctx, clientId);
+
+    const now = Date.now();
+    for (const touchedInvoiceId of touchedInvoiceIds) {
+      const invoice = await ctx.db.get(touchedInvoiceId);
+      if (!invoice || invoice.paymentType !== "credit") continue;
+      if (invoice.status === "returned") continue;
+      const paidMadCents = await invoicePaymentsTotalCents(ctx, touchedInvoiceId);
+      const nextStatus =
+        paidMadCents >= invoice.totalMadCents ? "paid" : "pending";
+      if (invoice.status !== nextStatus) {
+        await ctx.db.patch(touchedInvoiceId, {
+          status: nextStatus,
+          updatedAt: now,
+        });
+      }
+      await syncInvoiceLedgerEntry(ctx, touchedInvoiceId);
+    }
+
+    await recordAuditForUser(ctx, userId, user, {
+      action: "credits.removePayment",
+      entityType: "payment",
+      entityId: args.ledgerEntryId,
+      summary: `Paiement supprimé: ${ref} (${amountMad} MAD)`,
+      payload: {
+        clientId,
+        planId,
+        invoiceId,
+        amountMad,
+        date: entry.date,
+        ref,
+        note: entry.note,
+      },
+      source: "manual",
+    });
+
+    return null;
   },
 });

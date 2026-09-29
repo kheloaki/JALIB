@@ -232,6 +232,30 @@ export async function persistLedgerPaymentAllocations(
   const { allocations } = await runClientInvoiceSettlementResolved(ctx, entries);
   const now = Date.now();
   const touchedInvoiceIds = new Set<Id<"invoices">>();
+  const currentKeys = new Set(
+    allocations.map(
+      (allocation) => `${allocation.ledgerEntryId}|${allocation.invoiceId}`,
+    ),
+  );
+
+  const paymentEntryIds = entries
+    .filter((entry) => ledgerEntryIsPayment(entry))
+    .map((entry) => entry._id);
+
+  for (const paymentEntryId of paymentEntryIds) {
+    const linkedPayments = await ctx.db
+      .query("invoicePayments")
+      .withIndex("by_ledgerEntryId", (q) =>
+        q.eq("ledgerEntryId", paymentEntryId),
+      )
+      .take(50);
+    for (const row of linkedPayments) {
+      const key = `${paymentEntryId}|${row.invoiceId}`;
+      if (currentKeys.has(key)) continue;
+      touchedInvoiceIds.add(row.invoiceId);
+      await ctx.db.delete(row._id);
+    }
+  }
 
   for (const allocation of allocations) {
     const existingForInvoice = await ctx.db
@@ -265,6 +289,13 @@ export async function persistLedgerPaymentAllocations(
       createdAt: now,
     });
     touchedInvoiceIds.add(allocation.invoiceId);
+  }
+
+  // Also refresh status on invoices that lost all allocations (e.g. after payment delete).
+  for (const entry of entries) {
+    if (entry.kind === "invoice" && entry.invoiceId) {
+      touchedInvoiceIds.add(entry.invoiceId);
+    }
   }
 
   await Promise.all(

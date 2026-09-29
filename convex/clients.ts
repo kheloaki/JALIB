@@ -287,7 +287,7 @@ export const findByFullName = query({
 });
 
 export const get = query({
-  args: { clientId: v.id("clients") },
+  args: { clientId: v.string() },
   returns: v.union(clientView, v.null()),
   handler: async (ctx, args) => {
     await requireAnyPermission(ctx, [
@@ -297,7 +297,10 @@ export const get = query({
       "sales.create",
       "sales.assist_cart",
     ]);
-    const client = await ctx.db.get(args.clientId);
+    // Stale localStorage / drafts may hold IDs from other tables (e.g. authVerifiers).
+    const clientId = ctx.db.normalizeId("clients", args.clientId);
+    if (!clientId) return null;
+    const client = await ctx.db.get(clientId);
     return client ? toClientView(client) : null;
   },
 });

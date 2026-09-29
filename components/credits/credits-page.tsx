@@ -140,7 +140,8 @@ function CreditsPageContent() {
   );
 
   const currentUser = useQuery(api.authz.currentUser);
-  const canVerify = canVerifyCreditInvoices(currentUser?.permissions ?? []);
+  const permissions = currentUser?.permissions ?? [];
+  const canVerify = canVerifyCreditInvoices(permissions);
 
   const creditStore = useMemo<CreditStore>(() => {
     const entriesByClient: CreditStore["entriesByClient"] = {};

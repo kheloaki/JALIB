@@ -164,6 +164,13 @@ export function canCollectCredits(permissions: readonly string[]) {
   return permissions.includes("credits.collect");
 }
 
+export function canDeleteCreditPayments(permissions: readonly string[]) {
+  return (
+    permissions.includes("credits.collect") ||
+    permissions.includes("credits.approve")
+  );
+}
+
 export function canVerifyCreditInvoices(permissions: readonly string[]) {
   return permissions.includes("credits.verify");
 }
