@@ -78,8 +78,9 @@ export function ConfirmDeleteDialog({
         <div className="space-y-2">
           <label
             htmlFor="confirm-delete-input"
-            className="text-on-surface text-xs font-bold tracking-wide uppercase"
+            className="text-on-surface text-xs font-bold tracking-wide"
           >
+            {/* Keep exact casing — confirmation is case-sensitive. */}
             {typePrompt ??
               `Tapez « ${expected} » pour confirmer`}
           </label>
