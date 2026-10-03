@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   PosDialog,
-  PosDialogContent,
+  PosKeypadDialogContent,
   PosDialogDescription,
   PosDialogFooter,
   PosDialogHeader,
@@ -201,7 +201,7 @@ export function PosCartWeightKeypadDialog({
 
   return (
     <PosDialog open={open} onOpenChange={onOpenChange}>
-      <PosDialogContent
+      <PosKeypadDialogContent
         showCloseButton
         className="border-sidebar-border bg-surface-container-lowest text-on-surface max-w-md gap-0 overflow-hidden rounded-3xl p-0 sm:max-w-lg"
       >
@@ -326,7 +326,7 @@ export function PosCartWeightKeypadDialog({
             {tr("Valider", "تأكيد")}
           </Button>
         </PosDialogFooter>
-      </PosDialogContent>
+      </PosKeypadDialogContent>
     </PosDialog>
   );
 }
