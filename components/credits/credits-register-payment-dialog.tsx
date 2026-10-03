@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useLocale } from "next-intl";
 import { useMutation, useQuery } from "convex/react";
-import { Banknote } from "lucide-react";
+import { Banknote, Loader2 } from "lucide-react";
 
 import { MadPriceField } from "@/components/money/mad-price-field";
 import type { Client } from "@/lib/clients/types";
@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { PosNestedDialogContent } from "@/components/pos/pos-dialog";
 import { Input } from "@/components/ui/input";
 import { FrenchDateInput } from "@/components/ui/french-date-input";
 import { useToast } from "@/components/ui/toaster";
@@ -34,12 +35,15 @@ export function CreditsRegisterPaymentDialog({
   open,
   onOpenChange,
   tr,
+  nested = false,
 }: {
   client: Client | null;
   creditStore: CreditStore;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tr: (fr: string, ar: string) => string;
+  /** Open above another POS dialog (client profile). */
+  nested?: boolean;
 }) {
   const locale = useLocale();
   const toast = useToast();
@@ -51,6 +55,7 @@ export function CreditsRegisterPaymentDialog({
   );
   const [payNote, setPayNote] = useState("");
   const [payLinkedPlanId, setPayLinkedPlanId] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const planRows = useQuery(
     api.installmentPlans.listByClient,
@@ -110,7 +115,7 @@ export function CreditsRegisterPaymentDialog({
 
   async function handleRegisterPayment(e: React.FormEvent) {
     e.preventDefault();
-    if (!client) return;
+    if (!client || saving) return;
     if (payAmount <= 0) return;
     const amt = Math.round(payAmount * 100) / 100;
 
@@ -130,6 +135,7 @@ export function CreditsRegisterPaymentDialog({
       return;
     }
 
+    setSaving(true);
     try {
       await recordCreditPayment({
         clientId: client.id as Id<"clients">,
@@ -151,18 +157,23 @@ export function CreditsRegisterPaymentDialog({
         tr("Paiement non enregistré", "لم يتم تسجيل الدفعة"),
         error instanceof Error ? error.message : "Une erreur est survenue.",
       );
+    } finally {
+      setSaving(false);
     }
   }
+
+  const Content = nested ? PosNestedDialogContent : DialogContent;
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        if (saving) return;
         if (!next) resetForm();
         onOpenChange(next);
       }}
     >
-      <DialogContent className="max-w-lg">
+      <Content className="max-w-lg">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="bg-secondary-container text-on-secondary-container flex h-10 w-10 items-center justify-center rounded-xl">
@@ -218,6 +229,7 @@ export function CreditsRegisterPaymentDialog({
                   labelAr="المبلغ"
                   wrapperClassName="max-w-full"
                   className="text-lg font-bold"
+                  disabled={saving}
                 />
               </div>
               <div>
@@ -229,6 +241,7 @@ export function CreditsRegisterPaymentDialog({
                   onValueChange={setPayDate}
                   className="bg-surface-container-low h-11 rounded-xl"
                   required
+                  disabled={saving}
                 />
               </div>
               <div className="sm:col-span-2">
@@ -240,6 +253,7 @@ export function CreditsRegisterPaymentDialog({
                   onChange={(e) => setPayNote(e.target.value)}
                   placeholder={tr("Paiement partiel, Chèque…", "دفع جزئي، شيك…")}
                   className="bg-surface-container-low h-11 rounded-xl"
+                  disabled={saving}
                 />
               </div>
               <div className="sm:col-span-2">
@@ -254,6 +268,7 @@ export function CreditsRegisterPaymentDialog({
                   value={payLinkedPlanId}
                   onChange={(e) => setPayLinkedPlanId(e.target.value)}
                   className="border-input bg-surface-container-low h-11 w-full rounded-xl border px-3 text-sm"
+                  disabled={saving}
                 >
                   <option value="">
                     {tr("Aucun — solde global", "لا شيء — الرصيد الإجمالي")}
@@ -296,18 +311,30 @@ export function CreditsRegisterPaymentDialog({
               <Button
                 type="button"
                 variant="outline"
+                disabled={saving}
                 onClick={() => onOpenChange(false)}
                 className="rounded-xl font-bold"
               >
                 {tr("Annuler", "إلغاء")}
               </Button>
-              <Button type="submit" className="rounded-xl font-bold">
-                {tr("Enregistrer", "حفظ")}
+              <Button
+                type="submit"
+                disabled={saving || payAmount <= 0}
+                className="rounded-xl font-bold"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="me-1.5 size-4 animate-spin" aria-hidden />
+                    {tr("Enregistrement…", "جاري التسجيل…")}
+                  </>
+                ) : (
+                  tr("Enregistrer", "حفظ")
+                )}
               </Button>
             </DialogFooter>
           </form>
         ) : null}
-      </DialogContent>
+      </Content>
     </Dialog>
   );
 }

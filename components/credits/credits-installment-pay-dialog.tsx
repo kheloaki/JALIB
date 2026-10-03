@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLocale } from "next-intl";
 import { useMutation } from "convex/react";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, Loader2 } from "lucide-react";
 
 import { MadPriceField } from "@/components/money/mad-price-field";
 import type { CreditStore } from "@/lib/credits/types";
@@ -51,6 +51,7 @@ export function CreditsInstallmentPayDialog({
   const locale = useLocale();
   const recordCreditPayment = useMutation(api.credits.recordPayment);
   const setInstallmentPlanStatus = useMutation(api.installmentPlans.setStatus);
+  const [saving, setSaving] = useState(false);
 
   const metrics = useMemo(() => {
     if (!draft) return null;
@@ -73,17 +74,26 @@ export function CreditsInstallmentPayDialog({
 
   async function submitInstallmentPayment(e: React.FormEvent) {
     e.preventDefault();
-    if (!draft) return;
+    if (!draft || saving) return;
     const { plan, amount: amountRaw, date, note } = draft;
     if (plan.status !== "active") return;
 
     const remaining = planRemainingForStore(plan, creditStore.entriesByClient);
     if (remaining <= 0) {
-      await setInstallmentPlanStatus({
-        planId: plan.id as Id<"installmentPlans">,
-        status: "completed",
-      });
-      onClose();
+      setSaving(true);
+      try {
+        await setInstallmentPlanStatus({
+          planId: plan.id as Id<"installmentPlans">,
+          status: "completed",
+        });
+        onClose();
+      } catch (err) {
+        onErrorChange(
+          err instanceof Error ? err.message : "Une erreur est survenue.",
+        );
+      } finally {
+        setSaving(false);
+      }
       return;
     }
 
@@ -93,6 +103,7 @@ export function CreditsInstallmentPayDialog({
       return;
     }
 
+    setSaving(true);
     try {
       await recordCreditPayment({
         clientId: plan.clientId as Id<"clients">,
@@ -107,6 +118,8 @@ export function CreditsInstallmentPayDialog({
       onErrorChange(
         err instanceof Error ? err.message : "Une erreur est survenue.",
       );
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -114,6 +127,7 @@ export function CreditsInstallmentPayDialog({
     <Dialog
       open={Boolean(draft)}
       onOpenChange={(open) => {
+        if (saving) return;
         if (!open) {
           onClose();
           onErrorChange(null);
@@ -187,6 +201,7 @@ export function CreditsInstallmentPayDialog({
                   labelAr="المبلغ"
                   wrapperClassName="max-w-full"
                   className="h-12 rounded-xl border-2 text-lg font-black"
+                  disabled={saving}
                 />
                 <p className="text-on-surface-variant mt-2 text-[11px] font-medium">
                   {tr(
@@ -206,6 +221,7 @@ export function CreditsInstallmentPayDialog({
                   }
                   className="h-11 rounded-xl"
                   required
+                  disabled={saving}
                 />
               </div>
               <div>
@@ -218,6 +234,7 @@ export function CreditsInstallmentPayDialog({
                     onDraftChange({ ...draft, note: e.target.value })
                   }
                   className="h-11 rounded-xl"
+                  disabled={saving}
                 />
               </div>
               {error ? (
@@ -233,12 +250,24 @@ export function CreditsInstallmentPayDialog({
                   type="button"
                   variant="outline"
                   className="rounded-xl font-bold"
+                  disabled={saving}
                   onClick={onClose}
                 >
                   {tr("Annuler", "إلغاء")}
                 </Button>
-                <Button type="submit" className="rounded-xl font-bold">
-                  {tr("Valider", "تأكيد")}
+                <Button
+                  type="submit"
+                  className="rounded-xl font-bold"
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="me-1.5 size-4 animate-spin" aria-hidden />
+                      {tr("Enregistrement…", "جاري التسجيل…")}
+                    </>
+                  ) : (
+                    tr("Valider", "تأكيد")
+                  )}
                 </Button>
               </DialogFooter>
             </div>

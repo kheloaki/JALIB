@@ -15,11 +15,11 @@ import { CreditsRegisterPaymentDialog } from "@/components/credits/credits-regis
 import { Button } from "@/components/ui/button";
 import {
   PosDialog,
-  PosDialogContent,
   PosDialogDescription,
   PosDialogFooter,
   PosDialogHeader,
   PosDialogTitle,
+  PosNestedDialogContent,
 } from "@/components/pos/pos-dialog";
 import { useToast } from "@/components/ui/toaster";
 import { api } from "@/convex/_generated/api";
@@ -355,6 +355,7 @@ export function PosClientProfileQuickActions({
         open={paymentOpen}
         onOpenChange={setPaymentOpen}
         tr={tr}
+        nested
       />
 
       <PosDialog
@@ -363,7 +364,7 @@ export function PosClientProfileQuickActions({
           if (!open && quickPaying === null) setPendingQuickPayAmount(null);
         }}
       >
-        <PosDialogContent className="max-w-sm rounded-2xl">
+        <PosNestedDialogContent className="max-w-sm rounded-2xl">
           <PosDialogHeader>
             <PosDialogTitle className="text-lg font-black">
               {tr("Confirmer le paiement", "تأكيد الدفعة")}
@@ -452,7 +453,7 @@ export function PosClientProfileQuickActions({
               )}
             </Button>
           </PosDialogFooter>
-        </PosDialogContent>
+        </PosNestedDialogContent>
       </PosDialog>
 
     </>
